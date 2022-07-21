@@ -66,13 +66,13 @@ task sourceJar(type: Jar) {
 
 publishing {
     publications {
-        release(MavenPublication) {
+        /*release(MavenPublication) {
             groupId 'com.ledger.live'
             artifactId 'android-transport-ble'
             version '1.0.0'
 
             artifact("$buildDir/outputs/aar/transport-ble-release.aar")
-        }
+        }*/
 
         debug(MavenPublication) {
             groupId 'com.ledger.live'
