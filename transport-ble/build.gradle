@@ -84,7 +84,7 @@ publishing {
         }
     }
 
-    repositories {
+    /*repositories {
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/LedgerHQ/hw-transport-android-ble")
@@ -100,5 +100,5 @@ publishing {
             }
 
         }
-    }
+    }*/
 }

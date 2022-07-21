@@ -11,7 +11,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         jcenter()
-        maven {
+       /* maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/LedgerHQ/hw-transport-android-ble")
 
@@ -24,7 +24,7 @@ dependencyResolutionManagement {
                 username = buildProperties["ghp.usr"]
                 password = buildProperties["ghp.key"]
             }
-        }
+        }*/
         maven { url 'https://jitpack.io' }
     }
 }
