@@ -1,6 +1,7 @@
 package com.ledger.live.ble.model
 
 import android.util.Log
+/*
 import com.ledger.live.core.TransportError
 
 sealed class BleTransportError constructor(private val description: String): TransportError {
@@ -15,3 +16,4 @@ sealed class BleTransportError constructor(private val description: String): Tra
     class ScanError(description: String):BleTransportError(description)
     //class LowerLevelError(description: String)
 }
+*/
