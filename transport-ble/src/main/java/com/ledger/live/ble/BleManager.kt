@@ -29,9 +29,11 @@ import timber.log.Timber
 import java.util.*
 
 @SuppressLint("MissingPermission")
-class BleManager private constructor(
+class BleManager internal constructor(
     private val context: Context
 ) {
+    private val scope = CoroutineScope(Dispatchers.IO + Job())
+
     private var isScanning: Boolean = false
     private val _bleState = MutableSharedFlow<BleState>(
         replay = 1,
@@ -169,10 +171,10 @@ class BleManager private constructor(
 
         //Expose scanned device list every second
         if (pollingJob == null) {
-            pollingJob = MainScope().launch(Dispatchers.IO) {
+            pollingJob = scope.launch() {
                 while (true) {
                     _bleState.tryEmit(BleState.Scanning(scannedDevices = scannedDevices))
-                    delay(1000)
+                    delay(SCAN_THROTTLE_MS)
                 }
             }
         }
@@ -182,12 +184,10 @@ class BleManager private constructor(
 
     fun stopScanning() {
         Timber.d("Stop Scanning")
-        runBlocking {
-            pollingJob?.cancel()
-            pollingJob = null
-            bluetoothScanner.stopScan(scanCallback)
-            isScanning = false
-        }
+        pollingJob?.cancel()
+        pollingJob = null
+        bluetoothScanner.stopScan(scanCallback)
+        isScanning = false
     }
 
     private var connectionCallback: BleManagerConnectionCallback? = null
@@ -207,7 +207,7 @@ class BleManager private constructor(
             }
         }
 
-        MainScope().launch {
+        scope.launch {
             internalConnect(address, callback)
         }
     }
@@ -216,7 +216,7 @@ class BleManager private constructor(
      * Use Event Flow for connection callback
      */
     fun connect(address: String) {
-        MainScope().launch {
+        scope.launch {
             internalConnect(address)
         }
     }
@@ -265,21 +265,22 @@ class BleManager private constructor(
             }
         }
 
-        MainScope().launch {
+        scope.launch {
             internalDisconnect()
         }
     }
 
     fun disconnect() {
-        MainScope().launch {
+        scope.launch {
             internalDisconnect()
         }
     }
 
     private var disconnectingDeferred: CompletableDeferred<Boolean>? = null
+
+    @Synchronized
     private suspend fun internalDisconnect() {
         Timber.d("internal Disconnect")
-        //disconnectingDeferred?.cancel()
         if (disconnectingDeferred == null
             || disconnectingDeferred?.isCompleted == true
             || disconnectingDeferred?.isCancelled == true
@@ -336,7 +337,7 @@ class BleManager private constructor(
                     bleService.disconnectService()
                 } else {
                     bleService.connect(connectedDevice.id)
-                    MainScope().launch {
+                    scope.launch {
                         bleService.listenEvents().collect { event ->
                             when (event) {
                                 is BleServiceEvent.BleDeviceConnected -> {
@@ -395,12 +396,8 @@ class BleManager private constructor(
     }
 
     companion object {
-        @Volatile
-        private var INSTANCE: BleManager? = null
-        fun getInstance(context: Context): BleManager = synchronized(this) {
-            INSTANCE ?: BleManager(context).also { INSTANCE = it }
-        }
 
+        private const val SCAN_THROTTLE_MS = 1000L
         const val NANO_X_SERVICE_UUID = "13D63400-2C97-0004-0000-4C6564676572"
         const val NANO_FTS_SERVICE_UUID = "13d63400-2c97-6004-0000-4c6564676572"
 
