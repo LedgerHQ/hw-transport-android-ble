@@ -26,11 +26,12 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = "11"
+        useIR = true
     }
     buildFeatures {
         compose true
@@ -46,7 +47,8 @@ android {
 }
 
 dependencies {
-    //implementation "com.ledger.live:android-transport-ble:1.0.0-rc8"
+    //implementation 'com.github.LedgerHQ:hw-transport-android-ble:feature~ble_library-SNAPSHOT'
+//    implementation "com.ledger.live:android-transport-ble:1.0.0-rc14"
     implementation(project(":transport-ble"))
 
     implementation 'androidx.core:core-ktx:1.8.0'
