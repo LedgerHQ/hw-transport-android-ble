@@ -69,9 +69,6 @@ task sourceJar(type: Jar) {
 afterEvaluate {
     publishing {
 
-        repositories {
-            maven { url 'https://jitpack.io' }
-        }
         publications {
             /*release(MavenPublication) {
                 groupId 'com.ledger.live'

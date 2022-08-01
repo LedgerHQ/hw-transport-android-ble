@@ -25,7 +25,10 @@ dependencyResolutionManagement {
                 password = buildProperties["ghp.key"]
             }
         }*/
-        maven { url 'https://jitpack.io' }
+        maven {
+            name = "Jitpack"
+            url 'https://jitpack.io'
+        }
     }
 }
 rootProject.name = "LiveTransportBle"
