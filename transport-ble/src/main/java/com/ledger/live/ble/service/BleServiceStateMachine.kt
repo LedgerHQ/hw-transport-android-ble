@@ -59,16 +59,9 @@ class BleServiceStateMachine(
     private fun handleGattCallbackEvent(event: GattCallbackEvent) {
         when (event) {
             is GattCallbackEvent.ConnectionState.Connected -> {
-                when(currentState) {
-                    BleServiceState.Created -> {
-                        timeoutJob.cancel()
-                        gattInteractor.discoverService()
-                        pushState(BleServiceState.WaitingServices)
-                    }
-                    else -> {
-                        pushState(BleServiceState.Error("Connected event should only be received when current state is Created"))
-                    }
-                }
+                timeoutJob.cancel()
+                gattInteractor.discoverService()
+                pushState(BleServiceState.WaitingServices)
             }
             is GattCallbackEvent.ServicesDiscovered -> {
                 val deviceService = parseServices(event.services)
@@ -77,15 +70,8 @@ class BleServiceStateMachine(
                     Timber.d("Current State $currentState")
 
                     this@BleServiceStateMachine.deviceService = deviceService
-                    when(currentState) {
-                        BleServiceState.WaitingServices -> {
-                            gattInteractor.enableNotification(deviceService)
-                            pushState(BleServiceState.WaitingNotificationEnable)
-                        }
-                        else -> {
-                            pushState(BleServiceState.Error("Connected event should only be received when current state is Created"))
-                        }
-                    }
+                    gattInteractor.enableNotification(deviceService)
+                    pushState(BleServiceState.WaitingNotificationEnable)
                 }
             }
             is GattCallbackEvent.WriteDescriptorAck -> {
