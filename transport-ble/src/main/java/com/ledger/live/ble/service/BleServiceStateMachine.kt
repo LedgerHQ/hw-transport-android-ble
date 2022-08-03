@@ -125,8 +125,12 @@ class BleServiceStateMachine(
                     }
                     is BleServiceState.WaitingResponse -> {
                         val answer = bleReceiver.handleAnswer(bleSender.pendingCommand!!.id, event.value.toHexString())
-                        bleSender.clearCommand()
-                        pushState(BleServiceState.Ready(deviceService, mtuSize, answer))
+                        if (answer != null) {
+                            bleSender.clearCommand()
+                            pushState(BleServiceState.Ready(deviceService, mtuSize, answer))
+                        } else {
+                            Timber.d("Still waiting for a part of the answer")
+                        }
                     }
                     else -> {
                         pushState(BleServiceState.Error("CharacteristicChanged event should only be received when current state is WaitingMtu or WaitingResponse"))
