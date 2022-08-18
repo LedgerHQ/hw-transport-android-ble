@@ -191,6 +191,9 @@ class BleManager internal constructor(
     }
 
     private var connectionCallback: BleManagerConnectionCallback? = null
+    @Volatile private var connectingJob: Job? = null
+    //Ensure only one connection is tried at a time
+    @Synchronized
     fun connect(
         address: String,
         onConnectSuccess: (BleDeviceModel) -> Unit,
@@ -207,27 +210,37 @@ class BleManager internal constructor(
             }
         }
 
-        scope.launch {
-            internalConnect(address, callback)
+        if (connectingJob == null
+            || connectingJob?.isCancelled == true
+            || connectingJob?.isCompleted == true
+        ) {
+            connectingJob = scope.launch {
+                internalConnect(address, callback)
+            }
         }
     }
 
     /**
      * Use Event Flow for connection callback
      */
+    @Synchronized
     fun connect(address: String) {
-        scope.launch {
-            internalConnect(address)
+        if (connectingJob == null
+            || connectingJob?.isCancelled == true
+            || connectingJob?.isCompleted == true
+        ) {
+            connectingJob = scope.launch {
+                internalConnect(address)
+            }
         }
     }
 
-    private var isConnecting: Boolean = false
+    @Synchronized
     private suspend fun internalConnect(
         address: String,
         callback: BleManagerConnectionCallback? = null
     ) {
-        Timber.d("Try Connecting to device with address $address")
-        isConnecting = true
+        Timber.d("($this) - Try Connecting to device with address $address")
         stopScanning()
         internalDisconnect()
 
@@ -256,23 +269,39 @@ class BleManager internal constructor(
 
     //- Disconnect
     private var disconnectionCallback: BleManagerDisconnectionCallback? = null
+    @Volatile private var disconnectingJob: Job? = null
+    @Synchronized
     fun disconnect(
         onDisconnectSuccess: () -> Unit,
     ) {
+        Timber.d("Called disconnect")
         disconnectionCallback = object : BleManagerDisconnectionCallback {
             override fun onDisconnectionSuccess() {
                 onDisconnectSuccess()
             }
         }
 
-        scope.launch {
-            internalDisconnect()
+        if (disconnectingJob == null
+            || disconnectingJob?.isCancelled == true
+            || disconnectingJob?.isCompleted == true
+        ) {
+            disconnectingJob = scope.launch {
+                internalDisconnect()
+            }
         }
     }
 
+    @Synchronized
     fun disconnect() {
-        scope.launch {
-            internalDisconnect()
+        Timber.d("Called disconnect")
+
+        if (disconnectingJob == null
+            || disconnectingJob?.isCancelled == true
+            || disconnectingJob?.isCompleted == true
+        ) {
+            disconnectingJob = scope.launch {
+                internalDisconnect()
+            }
         }
     }
 
@@ -341,7 +370,6 @@ class BleManager internal constructor(
                         bleService.listenEvents().collect { event ->
                             when (event) {
                                 is BleServiceEvent.BleDeviceConnected -> {
-                                    isConnecting = false
                                     connectionCallback?.onConnectionSuccess(connectedDevice)
                                     _bleState.tryEmit(BleState.Connected(connectedDevice))
                                 }

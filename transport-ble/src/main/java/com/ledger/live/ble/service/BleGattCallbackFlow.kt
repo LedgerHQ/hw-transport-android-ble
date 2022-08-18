@@ -9,23 +9,29 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 
 class BleGattCallbackFlow: BluetoothGattCallback() {
 
-    private val _gattFlow = MutableSharedFlow<GattCallbackEvent>(replay = 0, extraBufferCapacity = 4)
+    private val _gattFlow = MutableSharedFlow<GattCallbackEvent>(replay = 1, extraBufferCapacity = 0)
     val gattFlow: Flow<GattCallbackEvent>
         get() = _gattFlow
 
+    private fun pushEvent(event: GattCallbackEvent) {
+        runBlocking {
+            _gattFlow.emit(event)
+        }
+    }
 
     override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
         Timber.d("GATT connection state change. state: $newState, status: $status")
         when (newState) {
             BluetoothProfile.STATE_CONNECTED -> {
-                _gattFlow.tryEmit(GattCallbackEvent.ConnectionState.Connected)
+                pushEvent(GattCallbackEvent.ConnectionState.Connected)
             }
             BluetoothProfile.STATE_DISCONNECTED -> {
-                _gattFlow.tryEmit(GattCallbackEvent.ConnectionState.Disconnected)
+                pushEvent(GattCallbackEvent.ConnectionState.Disconnected)
             }
         }
     }
@@ -36,12 +42,12 @@ class BleGattCallbackFlow: BluetoothGattCallback() {
     ) {
         Timber.d("------------- onServicesDiscovered status: $status")
         if (status == BluetoothGatt.GATT_SUCCESS) {
-            _gattFlow.tryEmit(
+            pushEvent(
                 GattCallbackEvent.ServicesDiscovered(gatt.services)
             )
         } else {
             Timber.w("onServicesDiscovered received: $status")
-            _gattFlow.tryEmit(GattCallbackEvent.ConnectionState.Disconnected)
+            pushEvent(GattCallbackEvent.ConnectionState.Disconnected)
         }
     }
 
@@ -52,7 +58,7 @@ class BleGattCallbackFlow: BluetoothGattCallback() {
     ) {
         super.onDescriptorWrite(gatt, descriptor, status)
         Timber.d("------------- onDescriptorWrite status: $status")
-        _gattFlow.tryEmit(GattCallbackEvent.WriteDescriptorAck(status == BluetoothGatt.GATT_SUCCESS))
+        pushEvent(GattCallbackEvent.WriteDescriptorAck(status == BluetoothGatt.GATT_SUCCESS))
     }
 
     override fun onCharacteristicWrite(
@@ -61,7 +67,7 @@ class BleGattCallbackFlow: BluetoothGattCallback() {
         status: Int
     ) {
         Timber.d("------------- onCharacteristicWrite status: $status")
-        _gattFlow.tryEmit(GattCallbackEvent.WriteCharacteristicAck(status == BluetoothGatt.GATT_SUCCESS))
+        pushEvent(GattCallbackEvent.WriteCharacteristicAck(status == BluetoothGatt.GATT_SUCCESS))
 
     }
 
@@ -70,7 +76,7 @@ class BleGattCallbackFlow: BluetoothGattCallback() {
         characteristic: BluetoothGattCharacteristic
     ) {
         Timber.d("------------- onCharacteristicChanged status: ${characteristic.value.toHexString()}")
-        _gattFlow.tryEmit(GattCallbackEvent.CharacteristicChanged(characteristic.value))
+        pushEvent(GattCallbackEvent.CharacteristicChanged(characteristic.value))
     }
 }
 

@@ -25,6 +25,7 @@ class BleSender(
         return id
     }
 
+    @Synchronized
     fun dequeuApdu() {
         if (!isInitialized) {
             throw IllegalStateException("Should not try to dequeu before initialize BleSender")

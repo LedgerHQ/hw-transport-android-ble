@@ -22,7 +22,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        Timber.plant(DebugTree())
+        if (Timber.treeCount == 0) {
+            Timber.plant(DebugTree())
+        }
 
         val viewModel = ScanViewModel.ScanViewModelFactory(this).create(ScanViewModel::class.java)
         setContent {

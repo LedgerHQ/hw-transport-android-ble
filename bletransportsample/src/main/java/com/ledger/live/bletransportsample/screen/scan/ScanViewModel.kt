@@ -6,8 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ledger.live.ble.BleManager
+import com.ledger.live.ble.BleManagerFactory
 import com.ledger.live.ble.model.BleState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 
@@ -16,21 +18,28 @@ class ScanViewModel(
     context: Context,
 ) : ViewModel() {
 
+    private var listeningJob: Job? = null
     private var isScanning: Boolean = false
     private val _uiState: MutableSharedFlow<BleUiState> = MutableSharedFlow(extraBufferCapacity = 1)
     val uiState: Flow<BleUiState>
         get() = _uiState
 
-    private val bleManager: BleManager = BleManager.getInstance(context)
+    private val bleManager: BleManager = BleManagerFactory.newInstance(context)
 
     init {
-        bleManager.bleState
+        listeningJob = bleManager.bleState
             .onEach {
-                Timber.d("new state => ${it.toString()}")
+                Timber.d("[$this] new state => $it")
             }
             .onEach(this::handleState)
             .flowOn(Dispatchers.IO)
             .launchIn(viewModelScope)
+    }
+
+    override fun onCleared() {
+        Timber.d("On cleared called")
+        super.onCleared()
+        listeningJob?.cancel()
     }
 
     private fun handleState(state: BleState) {
@@ -95,7 +104,10 @@ class ScanViewModel(
     }
 
     fun connectNanoX() {
-        connectToDevice("DE:F1:55:51:C2:0C")
+        connectToDevice("DE:F1:9B:AA:53:4C")
+        connectToDevice("DE:F1:9B:AA:53:4C")
+        connectToDevice("DE:F1:9B:AA:53:4C")
+        connectToDevice("DE:F1:9B:AA:53:4C")
     }
 
     fun sendSmallApdu() {
@@ -129,7 +141,6 @@ class ScanViewModel(
     }
 
     fun disconnect() {
-        bleManager.disconnect()
         bleManager.disconnect {
             Timber.d("Disconnection has been done")
             _uiState.tryEmit(BleUiState.Idle)

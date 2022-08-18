@@ -38,11 +38,10 @@ class BleService : Service() {
     //Bluetooth related
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + Job())
     private lateinit var bluetoothAdapter: BluetoothAdapter
-    private var bluetoothGATT: BluetoothGatt? = null
     private var bluetoothDeviceAddress: String? = null
 
     private val gattCallback = BleGattCallbackFlow()
-    private lateinit var stateMachine: BleServiceStateMachine
+    private var stateMachine: BleServiceStateMachine? = null
 
     private val events: MutableSharedFlow<BleServiceEvent> = MutableSharedFlow(0, 1)
 
@@ -58,12 +57,10 @@ class BleService : Service() {
 
     fun disconnectService() {
         listenningJob?.cancel()
-        bluetoothGATT?.close()
-        bluetoothGATT?.disconnect()
-        bluetoothGATT = null
+        stateMachine?.clear()
+        stateMachine = null
 
         stopSelf()
-
         notify(BleServiceEvent.BleDeviceDisconnected)
     }
 
@@ -73,37 +70,37 @@ class BleService : Service() {
         // Try to reconnect.
         Timber.d("Connect to device address => $address.")
 
-        if (bluetoothDeviceAddress != null && address == bluetoothDeviceAddress && bluetoothGATT != null) {
-            Timber.d("Trying to use an existing mBluetoothGatt for connection.")
-            return bluetoothGATT?.connect() == true
+        if (bluetoothDeviceAddress != null && address == bluetoothDeviceAddress && stateMachine != null) {
+           stateMachine?.clear()
         }
 
         val device: BluetoothDevice = bluetoothAdapter.getRemoteDevice(address)
 
         // We want to directly connect to the device, so we are setting the autoConnect
         // parameter to false.
-        bluetoothGATT = device.connectGatt(this, false, gattCallback)
-        bluetoothDeviceAddress = address
-
         stateMachine = BleServiceStateMachine(
-            gattCallback.gattFlow,
-            GattInteractor(bluetoothGATT!!),
-            address
+            gattCallback,
+            address,
+            device
         )
         observeStateMachine()
+        stateMachine?.build(this.applicationContext)
+        bluetoothDeviceAddress = address
 
         return true
     }
 
+    var isReady = false
     private fun observeStateMachine() {
-
-        stateMachine.stateFlow.onEach {
-            Timber.d("State changed ; $it")
+        listenningJob = stateMachine?.stateFlow?.onEach {
+            Timber.d("State changed >>>> $it")
             when (it) {
-                is BleServiceStateMachine.BleServiceState.WaitingServices -> {
-                    notify(BleServiceEvent.BleDeviceConnected)
-                }
                 is BleServiceStateMachine.BleServiceState.Ready -> {
+                    if (isReady == false) {
+                        isReady =  true
+                        notify(BleServiceEvent.BleDeviceConnected)
+                    }
+
                     it.answer?.let { answer ->
                         notify(
                             BleServiceEvent.SendAnswer(
@@ -114,12 +111,13 @@ class BleService : Service() {
                     }
                 }
                 is BleServiceStateMachine.BleServiceState.Error -> {
+                    Timber.e(it.error)
                     disconnectService()
                 }
             }
         }
-        .flowOn(Dispatchers.IO)
-        .launchIn(scope)
+        ?.flowOn(Dispatchers.IO)
+        ?.launchIn(scope)
     }
 
     private fun notify(event: BleServiceEvent) {
@@ -137,7 +135,7 @@ class BleService : Service() {
             disconnectService()
         }
 
-        return stateMachine.sendApdu(apdu)
+        return stateMachine!!.sendApdu(apdu)
     }
 
     companion object {
