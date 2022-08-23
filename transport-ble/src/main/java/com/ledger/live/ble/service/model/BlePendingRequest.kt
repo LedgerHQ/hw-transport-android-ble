@@ -1,4 +1,4 @@
-package com.ledger.live.ble.service
+package com.ledger.live.ble.service.model
 
 data class BlePendingRequest(
     val id: String,

@@ -9,6 +9,8 @@ import com.ledger.live.ble.extension.toHexString
 import com.ledger.live.ble.extension.toUUID
 import com.ledger.live.ble.model.BleDeviceService
 import com.ledger.live.ble.service.BleService.Companion.MTU_HANDSHAKE_COMMAND
+import com.ledger.live.ble.service.model.BleAnswer
+import com.ledger.live.ble.service.model.GattCallbackEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*

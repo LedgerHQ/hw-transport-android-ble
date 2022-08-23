@@ -20,7 +20,7 @@ import com.ledger.live.ble.model.BleDeviceModel
 import com.ledger.live.ble.model.BleEvent
 import com.ledger.live.ble.model.BleState
 import com.ledger.live.ble.service.BleService
-import com.ledger.live.ble.service.BleServiceEvent
+import com.ledger.live.ble.service.model.BleServiceEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
@@ -94,7 +94,7 @@ class BleManager internal constructor(
                         scannedDevices.add(
                             BleDeviceModel(
                                 id = device.address,
-                                name = device.name,
+                                name = device.name ?: "Unknown Device (No Name)",
                                 serviceId = device.uuids?.first()?.uuid.toString(),
                                 rssi = rssi
                             )
@@ -165,7 +165,7 @@ class BleManager internal constructor(
 
         val scanSettings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
-            .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH or ScanSettings.CALLBACK_TYPE_MATCH_LOST)
             .build()
         bluetoothScanner.startScan(filters, scanSettings, scanCallback)
 

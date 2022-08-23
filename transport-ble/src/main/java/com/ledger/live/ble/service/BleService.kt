@@ -6,6 +6,7 @@ import android.bluetooth.*
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
+import com.ledger.live.ble.service.model.BleServiceEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import timber.log.Timber

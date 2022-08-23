@@ -1,4 +1,4 @@
-package com.ledger.live.ble.service
+package com.ledger.live.ble.service.model
 
 sealed class BleServiceEvent {
     object BleDeviceConnected: BleServiceEvent()

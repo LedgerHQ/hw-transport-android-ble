@@ -1,14 +1,10 @@
 package com.ledger.live.ble.service
 
 import android.bluetooth.*
-import com.ledger.live.ble.BleManager
 import com.ledger.live.ble.extension.toHexString
-import com.ledger.live.ble.extension.toUUID
-import com.ledger.live.ble.model.BleDeviceService
+import com.ledger.live.ble.service.model.GattCallbackEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 
@@ -80,13 +76,3 @@ class BleGattCallbackFlow: BluetoothGattCallback() {
     }
 }
 
-sealed class GattCallbackEvent {
-    sealed class ConnectionState: GattCallbackEvent() {
-        object Connected: GattCallbackEvent()
-        object Disconnected: GattCallbackEvent()
-    }
-    data class ServicesDiscovered(val services: List<BluetoothGattService>): GattCallbackEvent()
-    data class CharacteristicChanged(val value: ByteArray): GattCallbackEvent()
-    data class WriteDescriptorAck(val isSuccess: Boolean): GattCallbackEvent()
-    data class WriteCharacteristicAck(val isSuccess: Boolean): GattCallbackEvent()
-}

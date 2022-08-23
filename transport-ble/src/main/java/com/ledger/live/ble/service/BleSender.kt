@@ -1,11 +1,10 @@
 package com.ledger.live.ble.service
 
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothGatt
-import com.ledger.live.ble.extension.toHexString
 import com.ledger.live.ble.model.BleCommand
 import com.ledger.live.ble.model.BleDeviceService
 import com.ledger.live.ble.model.FrameCommand
+import com.ledger.live.ble.service.model.BlePendingRequest
 import timber.log.Timber
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
