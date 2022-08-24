@@ -25,6 +25,11 @@ class GattInteractor(val gatt: BluetoothGatt) {
         }
     }
 
+    fun negotiateMtu() {
+        Timber.d("Megociate MTU")
+        gatt.requestMtu(MAX_MTU_VALUE)
+    }
+
     fun askMtu(deviceService: BleDeviceService) {
         Timber.d("Ask MTU size")
         deviceService.writeCharacteristic.value = BleService.MTU_HANDSHAKE_COMMAND.fromHexStringToBytes()
@@ -41,5 +46,10 @@ class GattInteractor(val gatt: BluetoothGatt) {
                 gatt.writeCharacteristic(it.writeCharacteristic)
             }
         }
+    }
+
+    companion object{
+        private const val MAX_MTU_VALUE = 512
+        const val GATT_HEADER_SIZE = 3
     }
 }

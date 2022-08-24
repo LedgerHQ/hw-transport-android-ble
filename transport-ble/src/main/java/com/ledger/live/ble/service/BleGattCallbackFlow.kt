@@ -47,6 +47,17 @@ class BleGattCallbackFlow: BluetoothGattCallback() {
         }
     }
 
+    override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
+        super.onMtuChanged(gatt, mtu, status)
+        Timber.d("------------ onMtuChanged => MTU new size: $mtu")
+        if (status == BluetoothGatt.GATT_SUCCESS) {
+            pushEvent(GattCallbackEvent.MtuNegociated(mtu - GattInteractor.GATT_HEADER_SIZE))
+        } else {
+            Timber.w("onMtuChanged error with status : $status")
+            pushEvent(GattCallbackEvent.ConnectionState.Disconnected)
+        }
+    }
+
     override fun onDescriptorWrite(
         gatt: BluetoothGatt,
         descriptor: BluetoothGattDescriptor?,

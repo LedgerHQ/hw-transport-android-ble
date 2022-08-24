@@ -25,6 +25,7 @@ class BleServiceStateMachine(
     var currentState: BleServiceState = BleServiceState.Created
     lateinit var deviceService: BleDeviceService
     var mtuSize = -1
+    private var negociatedMtu = -1
     private val bleReceiver = BleReceiver()
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
@@ -100,8 +101,8 @@ class BleServiceStateMachine(
                     this@BleServiceStateMachine.deviceService = deviceService
                     when(currentState) {
                         BleServiceState.WaitingServices -> {
-                            pushState(BleServiceState.WaitingNotificationEnable)
-                            gattInteractor.enableNotification(deviceService)
+                            pushState(BleServiceState.NegotiatingMtu)
+                            gattInteractor.negotiateMtu()
                         }
                         else -> {
                             pushState(BleServiceState.Error("ServicesDiscovered event should only be received when current state is WaitingServices"))
@@ -109,10 +110,22 @@ class BleServiceStateMachine(
                     }
                 }
             }
+            is GattCallbackEvent.MtuNegociated -> {
+                when(currentState) {
+                    BleServiceState.NegotiatingMtu -> {
+                        negociatedMtu = event.mtuSize
+                        pushState(BleServiceState.WaitingNotificationEnable)
+                        gattInteractor.enableNotification(deviceService)
+                    }
+                    else -> {
+                        pushState(BleServiceState.Error("WriteDescriptorAck event should only be received when current state is WaitingNotificationEnable"))
+                    }
+                }
+            }
             is GattCallbackEvent.WriteDescriptorAck -> {
                 when(currentState) {
                     BleServiceState.WaitingNotificationEnable -> {
-                        pushState(BleServiceState.WaitingMtu)
+                        pushState(BleServiceState.CheckingMtu)
                         gattInteractor.askMtu(deviceService)
                     }
                     else -> {
@@ -122,7 +135,7 @@ class BleServiceStateMachine(
             }
             is GattCallbackEvent.WriteCharacteristicAck -> {
                 when(currentState) {
-                    BleServiceState.WaitingMtu -> {
+                    BleServiceState.CheckingMtu -> {
                         Timber.d("Mtu request Sent")
                     }
                     is BleServiceState.Ready -> {
@@ -140,10 +153,15 @@ class BleServiceStateMachine(
             }
             is GattCallbackEvent.CharacteristicChanged -> {
                 when(currentState) {
-                    BleServiceState.WaitingMtu -> {
+                    BleServiceState.CheckingMtu -> {
                         mtuSize = event.value.toHexString().substring(MTU_HANDSHAKE_COMMAND.length).toInt(16)
-                        pushState(BleServiceState.Ready(deviceService, mtuSize, null))
                         Timber.d("Mtu Value received : $mtuSize")
+                        Timber.d("Negociated Mtu Value received : $negociatedMtu")
+                        if (mtuSize != negociatedMtu) {
+                            Timber.e("ERROR MTU CHECKED IS NOT THE SAME THAN NEGOTIATED MTU")
+                        }
+
+                        pushState(BleServiceState.Ready(deviceService, negociatedMtu, null))
                     }
                     is BleServiceState.WaitingResponse -> {
                         val answer = bleReceiver.handleAnswer(bleSender.pendingCommand!!.id, event.value.toHexString())
@@ -220,8 +238,9 @@ class BleServiceStateMachine(
     sealed class BleServiceState {
         object Created : BleServiceState()
         object WaitingServices: BleServiceState()
+        object NegotiatingMtu: BleServiceState()
         object WaitingNotificationEnable : BleServiceState()
-        object WaitingMtu : BleServiceState()
+        object CheckingMtu : BleServiceState()
         data class Ready(val deviceService: BleDeviceService, val mtu: Int, val answer: BleAnswer? = null) : BleServiceState()
         data class WaitingResponse(val sendId: String) : BleServiceState()
         data class Error(val error: String): BleServiceState()
@@ -229,6 +248,7 @@ class BleServiceStateMachine(
 
     companion object {
         private const val CONNECT_TIMEOUT = 5_000L
+        private const val DEFAULT_MTU_NO_NEGOCIATED = 23
 
     }
 }

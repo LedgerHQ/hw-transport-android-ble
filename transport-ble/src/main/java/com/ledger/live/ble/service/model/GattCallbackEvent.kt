@@ -7,6 +7,7 @@ sealed class GattCallbackEvent {
         object Connected: GattCallbackEvent()
         object Disconnected: GattCallbackEvent()
     }
+    data class MtuNegociated(val mtuSize: Int): GattCallbackEvent()
     data class ServicesDiscovered(val services: List<BluetoothGattService>): GattCallbackEvent()
     data class CharacteristicChanged(val value: ByteArray): GattCallbackEvent()
     data class WriteDescriptorAck(val isSuccess: Boolean): GattCallbackEvent()
