@@ -60,19 +60,21 @@ class BleManager internal constructor(
     private var scannedDevices: MutableList<BleDeviceModel> = mutableListOf()
     private val scanCallback: ScanCallback = object : ScanCallback() {
         override fun onBatchScanResults(results: MutableList<ScanResult>?) {
+            Timber.d("Batch result")
+            var added = false
             results?.let {
-                results.forEach {
-                    val device = it.device
-                    val rssi = it.rssi
-                    scannedDevices.add(
-                        BleDeviceModel(
-                            id = device.address,
-                            name = device.name,
-                            serviceId = device.uuids.first().uuid.toString(),
-                            rssi = rssi
-                        )
-                    )
+                results.forEach { res ->
+                    val device = parseScanResult(res)
+                    if (device != null && scannedDevices.find {scannedDevice -> scannedDevice.id == device.id } == null) {
+                        scannedDevices.add(device)
+                        onScanDevicesCallback?.invoke(scannedDevices)
+                        added = true
+                    }
                 }
+            }
+
+            if (added) {
+                onScanDevicesCallback?.invoke(scannedDevices)
             }
         }
 
@@ -82,24 +84,13 @@ class BleManager internal constructor(
         }
 
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            Timber.d("Scan result received")
             when (callbackType) {
                 ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
                 ScanSettings.CALLBACK_TYPE_FIRST_MATCH -> {
-                    Timber.d("Scan result => Match")
-                    val device = result.device
-                    val rssi = result.rssi
-
-                    if (scannedDevices.find { it.id == result.device.address } == null) {
-                        scannedDevices.add(
-                            BleDeviceModel(
-                                id = device.address,
-                                name = device.name ?: "Unknown Device (No Name)",
-                                serviceId = device.uuids?.first()?.uuid.toString(),
-                                rssi = rssi
-                            )
-                        )
-
+                    Timber.d("Scan result => FIRST_MATCH")
+                    val device = parseScanResult(result)
+                    if (device != null && scannedDevices.find { it.id == device.id } == null) {
+                        scannedDevices.add(device)
                         onScanDevicesCallback?.invoke(scannedDevices)
                     }
                 }
@@ -110,6 +101,7 @@ class BleManager internal constructor(
                     }
                 }
             }
+
             Timber.d("Scan Devices $scannedDevices")
         }
     }
@@ -117,13 +109,39 @@ class BleManager internal constructor(
     var pollingJob: Job? = null
     var onScanDevicesCallback: ((List<BleDeviceModel>) -> Unit)? = null
 
+    private fun parseScanResult(result: ScanResult): BleDeviceModel? {
+        val device = result.device
+        val rssi = result.rssi
+        val uuids = getServiceUUIDsList(result)
+        val name = device.name
+
+        return if (name != null && uuids.isNotEmpty()) {
+            Timber.d("Scan result device => \n id: ${device.address} \n name: $name \n serviceId : ${uuids.first()}")
+            BleDeviceModel(
+                id = device.address,
+                name = name,
+                serviceId = uuids.first().toString(),
+                rssi = rssi
+            )
+        } else null
+    }
+
+    private fun getServiceUUIDsList(scanResult: ScanResult): List<UUID> {
+        val parcelUuids = scanResult.scanRecord!!.serviceUuids
+        val serviceList: MutableList<UUID> = ArrayList()
+        for (i in parcelUuids.indices) {
+            val serviceUUID = parcelUuids[i].uuid
+            if (!serviceList.contains(serviceUUID)) serviceList.add(serviceUUID)
+        }
+        return serviceList
+    }
+
     /**
      * Use bleState for getting informations about running scan
      */
     fun startScanning(): Boolean {
         return internalStartScanning()
     }
-
 
     fun startScanning(
         onScanDevices: (List<BleDeviceModel>) -> Unit
@@ -163,10 +181,11 @@ class BleManager internal constructor(
 
         scannedDevices = mutableListOf()
 
-        val scanSettings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
-            .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH or ScanSettings.CALLBACK_TYPE_MATCH_LOST)
-            .build()
+        val builder = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+
+        val scanSettings = builder.build()
         bluetoothScanner.startScan(filters, scanSettings, scanCallback)
 
         //Expose scanned device list every second
@@ -191,7 +210,9 @@ class BleManager internal constructor(
     }
 
     private var connectionCallback: BleManagerConnectionCallback? = null
-    @Volatile private var connectingJob: Job? = null
+    @Volatile
+    private var connectingJob: Job? = null
+
     //Ensure only one connection is tried at a time
     @Synchronized
     fun connect(
@@ -269,7 +290,9 @@ class BleManager internal constructor(
 
     //- Disconnect
     private var disconnectionCallback: BleManagerDisconnectionCallback? = null
-    @Volatile private var disconnectingJob: Job? = null
+    @Volatile
+    private var disconnectingJob: Job? = null
+
     @Synchronized
     fun disconnect(
         onDisconnectSuccess: () -> Unit,
@@ -408,7 +431,6 @@ class BleManager internal constructor(
 
     private fun disconnected() {
         Timber.d("BleService disconnected")
-
         if (bluetoothService?.isBound == true) {
             context.unbindService(serviceConnection)
         } else {

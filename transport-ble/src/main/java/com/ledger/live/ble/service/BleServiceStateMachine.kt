@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattService
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import com.ledger.live.ble.BleManager
 import com.ledger.live.ble.extension.toHexString
 import com.ledger.live.ble.extension.toUUID
@@ -22,18 +23,19 @@ class BleServiceStateMachine(
     private val deviceAddress: String,
     private val device: BluetoothDevice,
 ) {
-    var currentState: BleServiceState = BleServiceState.Created
-    lateinit var deviceService: BleDeviceService
+    private var isCleared: Boolean = false
+    internal var currentState: BleServiceState = BleServiceState.Created
+    internal lateinit var deviceService: BleDeviceService
     var mtuSize = -1
-    private var negociatedMtu = -1
+    internal var negotiatedMtu = -1
     private val bleReceiver = BleReceiver()
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
-    private var timeoutJob: Job
+    internal lateinit var timeoutJob: Job
 
     private val _stateMachineFlow = MutableSharedFlow<BleServiceState>(replay = 1, extraBufferCapacity = 0, onBufferOverflow = BufferOverflow.SUSPEND)
     val stateFlow: Flow<BleServiceState>
-        get() = _stateMachineFlow
+        get() = _stateMachineFlow.filter { !isCleared }
 
     private lateinit var gattInteractor: GattInteractor
 
@@ -43,24 +45,26 @@ class BleServiceStateMachine(
             .onEach { handleGattCallbackEvent(it) }
             .flowOn(Dispatchers.IO)
             .launchIn(scope)
-
-        timeoutJob = scope.launch {
-            delay(CONNECT_TIMEOUT)
-            _stateMachineFlow.tryEmit(BleServiceState.Error("Connection timeout error"))
-        }
     }
 
     fun build(context: Context) {
         val bluetoothGATT = device.connectGatt(context, false, gattCallbackFlow)
+        timeoutJob = scope.launch {
+            delay(CONNECT_TIMEOUT)
+            _stateMachineFlow.tryEmit(BleServiceState.Error(ERROR_TIMEOUT))
+        }
+
         this.gattInteractor = GattInteractor(bluetoothGATT!!)
+        this.isCleared = false
     }
 
     fun clear() {
+        this.isCleared = true
         this.gattInteractor.gatt.close()
         this.gattInteractor.gatt.disconnect()
     }
 
-    private val bleSender: BleSender by lazy {
+    internal val bleSender: BleSender by lazy {
         BleSender(gattInteractor, deviceAddress) { sendId ->
             pushState(BleServiceState.WaitingResponse(sendId))
         }
@@ -71,13 +75,16 @@ class BleServiceStateMachine(
         if (currentState is BleServiceState.Ready
             || currentState is BleServiceState.WaitingResponse) {
             bleSender.dequeuApdu()
-        } else { //Trigger Gatt initialization
+        } else { //Trigger Gatt initialization reset current state in order to ensure right initialization
+            timeoutJob.cancel()
+            pushState(BleServiceState.WaitingServices)
             gattInteractor.discoverService()
         }
 
         return id
     }
 
+    @VisibleForTesting
     private fun handleGattCallbackEvent(event: GattCallbackEvent) {
         when (event) {
             is GattCallbackEvent.ConnectionState.Connected -> {
@@ -88,37 +95,39 @@ class BleServiceStateMachine(
                         gattInteractor.discoverService()
                     }
                     else -> {
-                        pushState(BleServiceState.Error("Connected event should only be received when current state is Created"))
+                        pushState(BleServiceState.Error(ERROR_WRONG_STATE_FOR_CONNECTED_EVENT))
                     }
                 }
             }
             is GattCallbackEvent.ServicesDiscovered -> {
-                val deviceService = parseServices(event.services)
-                if (deviceService != null) {
-                    Timber.d("Devices Services parsed for given UUID ${deviceService?.uuid}")
-                    Timber.d("Current State $currentState")
-
-                    this@BleServiceStateMachine.deviceService = deviceService
                     when(currentState) {
                         BleServiceState.WaitingServices -> {
-                            pushState(BleServiceState.NegotiatingMtu)
-                            gattInteractor.negotiateMtu()
+                            val deviceService = parseServices(event.services)
+                            if (deviceService != null) {
+                                Timber.d("Devices Services parsed for given UUID ${deviceService?.uuid}")
+                                Timber.d("Current State $currentState")
+
+                                this@BleServiceStateMachine.deviceService = deviceService
+                                pushState(BleServiceState.NegotiatingMtu)
+                                gattInteractor.negotiateMtu()
+                            } else {
+                                _stateMachineFlow.tryEmit(BleServiceState.Error(ERROR_NO_SERVICES_FOUND))
+                            }
                         }
                         else -> {
-                            pushState(BleServiceState.Error("ServicesDiscovered event should only be received when current state is WaitingServices"))
+                            pushState(BleServiceState.Error(ERROR_WRONG_STATE_FOR_SERVICES_DISCOVERED))
                         }
                     }
-                }
             }
             is GattCallbackEvent.MtuNegociated -> {
                 when(currentState) {
                     BleServiceState.NegotiatingMtu -> {
-                        negociatedMtu = event.mtuSize
+                        negotiatedMtu = event.mtuSize
                         pushState(BleServiceState.WaitingNotificationEnable)
                         gattInteractor.enableNotification(deviceService)
                     }
                     else -> {
-                        pushState(BleServiceState.Error("WriteDescriptorAck event should only be received when current state is WaitingNotificationEnable"))
+                        pushState(BleServiceState.Error(ERROR_WRONG_STATE_FOR_MTU_NEGOTIATED))
                     }
                 }
             }
@@ -129,7 +138,7 @@ class BleServiceStateMachine(
                         gattInteractor.askMtu(deviceService)
                     }
                     else -> {
-                        pushState(BleServiceState.Error("WriteDescriptorAck event should only be received when current state is WaitingNotificationEnable"))
+                        pushState(BleServiceState.Error(ERROR_WRONG_STATE_FOR_WRITE_DESCRIPTOR_ACK))
                     }
                 }
             }
@@ -147,7 +156,7 @@ class BleServiceStateMachine(
                         bleSender.nextCommand()
                     }
                     else -> {
-                        pushState(BleServiceState.Error("WriteCharacteristicAck event should only be received when current state is WaitingMtu or WaitingResponse"))
+                        pushState(BleServiceState.Error(ERROR_WRONG_STATE_FOR_WRITE_CHARACTERISTIC_ACK))
                     }
                 }
             }
@@ -156,12 +165,12 @@ class BleServiceStateMachine(
                     BleServiceState.CheckingMtu -> {
                         mtuSize = event.value.toHexString().substring(MTU_HANDSHAKE_COMMAND.length).toInt(16)
                         Timber.d("Mtu Value received : $mtuSize")
-                        Timber.d("Negociated Mtu Value received : $negociatedMtu")
-                        if (mtuSize != negociatedMtu) {
-                            Timber.e("ERROR MTU CHECKED IS NOT THE SAME THAN NEGOTIATED MTU")
+                        Timber.d("Negotiated Mtu Value received : $negotiatedMtu")
+                        if (mtuSize != negotiatedMtu) {
+                            Timber.e(ERROR_MTU_NEGOTIATED_AND_CHECKED_DIVERGENT)
                         }
 
-                        pushState(BleServiceState.Ready(deviceService, negociatedMtu, null))
+                        pushState(BleServiceState.Ready(deviceService, negotiatedMtu, null))
                     }
                     is BleServiceState.WaitingResponse -> {
                         val answer = bleReceiver.handleAnswer(bleSender.pendingCommand!!.id, event.value.toHexString())
@@ -173,16 +182,17 @@ class BleServiceStateMachine(
                         }
                     }
                     else -> {
-                        pushState(BleServiceState.Error("CharacteristicChanged event should only be received when current state is WaitingMtu or WaitingResponse"))
+                        pushState(BleServiceState.Error(ERROR_WRONG_STATE_FOR_CHARACTERISTIC_CHANGED))
                     }
                 }
             }
             is GattCallbackEvent.ConnectionState.Disconnected -> {
-                pushState(BleServiceState.Error("Unexpected disconnection happened"))
+                pushState(BleServiceState.Error(ERROR_UNEXPECTED_DISCONNECTION))
             }
         }
     }
 
+    @VisibleForTesting
     private fun pushState(state: BleServiceState) {
         currentState = state
         //ensure state is pushed
@@ -229,10 +239,7 @@ class BleServiceStateMachine(
             }
         }
 
-        return deviceService ?: run {
-            _stateMachineFlow.tryEmit(BleServiceState.Error("No usable service found for device"))
-            null
-        }
+        return deviceService
     }
 
     sealed class BleServiceState {
@@ -248,7 +255,17 @@ class BleServiceStateMachine(
 
     companion object {
         private const val CONNECT_TIMEOUT = 5_000L
-        private const val DEFAULT_MTU_NO_NEGOCIATED = 23
 
+        internal const val ERROR_TIMEOUT = "Connection timeout error"
+        internal const val ERROR_MTU_NEGOTIATED_AND_CHECKED_DIVERGENT = "ERROR MTU CHECKED IS NOT THE SAME THAN NEGOTIATED MTU"
+        internal const val ERROR_NO_SERVICES_FOUND = "No usable service found for device"
+        internal const val ERROR_UNEXPECTED_DISCONNECTION = "Unexpected disconnection happened"
+
+        internal const val ERROR_WRONG_STATE_FOR_CONNECTED_EVENT = "Connected event should only be received when current state is Created"
+        internal const val ERROR_WRONG_STATE_FOR_SERVICES_DISCOVERED = "ServicesDiscovered event should only be received when current state is WaitingServices"
+        internal const val ERROR_WRONG_STATE_FOR_MTU_NEGOTIATED = "MtuNegociated event should only be received when current state is NegotiatingMtu"
+        internal const val ERROR_WRONG_STATE_FOR_WRITE_DESCRIPTOR_ACK = "WriteDescriptorAck event should only be received when current state is WaitingNotificationEnable"
+        internal const val ERROR_WRONG_STATE_FOR_WRITE_CHARACTERISTIC_ACK = "WriteCharacteristicAck event should only be received when current state is WaitingMtu or WaitingResponse"
+        internal const val ERROR_WRONG_STATE_FOR_CHARACTERISTIC_CHANGED = "CharacteristicChanged event should only be received when current state is WaitingMtu or WaitingResponse"
     }
 }

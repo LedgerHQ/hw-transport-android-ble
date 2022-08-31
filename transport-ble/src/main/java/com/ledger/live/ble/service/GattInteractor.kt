@@ -11,6 +11,10 @@ import timber.log.Timber
 @SuppressLint("MissingPermission")
 class GattInteractor(val gatt: BluetoothGatt) {
 
+    init {
+        gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+    }
+
     fun discoverService(){
         Timber.d("Try discover services")
         gatt.discoverServices()
