@@ -65,7 +65,7 @@ class BleManager internal constructor(
             results?.let {
                 results.forEach { res ->
                     val device = parseScanResult(res)
-                    if (device != null && scannedDevices.find {scannedDevice -> scannedDevice.id == device.id } == null) {
+                    if (device != null && scannedDevices.find { scannedDevice -> scannedDevice.id == device.id } == null) {
                         scannedDevices.add(device)
                         onScanDevicesCallback?.invoke(scannedDevices)
                         added = true
@@ -89,11 +89,17 @@ class BleManager internal constructor(
                 ScanSettings.CALLBACK_TYPE_FIRST_MATCH -> {
                     Timber.d("Scan result => FIRST_MATCH")
                     val device = parseScanResult(result)
+                    //New Device Detected
                     if (device != null && scannedDevices.find { it.id == device.id } == null) {
                         scannedDevices.add(device)
                         onScanDevicesCallback?.invoke(scannedDevices)
                     }
+                    //Known device (refresh)
+                    else if (device != null && scannedDevices.find { it.id == device.id } != null) {
+                        scannedDevices[scannedDevices.indexOfFirst { it.id == device.id }] = device
+                    }
                 }
+                //Not called
                 ScanSettings.CALLBACK_TYPE_MATCH_LOST -> {
                     Timber.d("Scan result => Lost")
                     if (scannedDevices.removeIf { it.id == result.device.address }) {
@@ -192,6 +198,12 @@ class BleManager internal constructor(
         if (pollingJob == null) {
             pollingJob = scope.launch() {
                 while (true) {
+                    //Check outdated match
+                    val currentTimestamp: Long = Date().time
+                    if (scannedDevices.removeAll { it.timestamp + SCAN_MATCH_TTL < currentTimestamp }) {
+                        onScanDevicesCallback?.invoke(scannedDevices)
+                    }
+
                     _bleState.tryEmit(BleState.Scanning(scannedDevices = scannedDevices))
                     delay(SCAN_THROTTLE_MS)
                 }
@@ -210,6 +222,7 @@ class BleManager internal constructor(
     }
 
     private var connectionCallback: BleManagerConnectionCallback? = null
+
     @Volatile
     private var connectingJob: Job? = null
 
@@ -290,6 +303,7 @@ class BleManager internal constructor(
 
     //- Disconnect
     private var disconnectionCallback: BleManagerDisconnectionCallback? = null
+
     @Volatile
     private var disconnectingJob: Job? = null
 
@@ -446,8 +460,9 @@ class BleManager internal constructor(
     }
 
     companion object {
-
+        private const val SCAN_MATCH_TTL = 3000L
         private const val SCAN_THROTTLE_MS = 1000L
+
         const val NANO_X_SERVICE_UUID = "13D63400-2C97-0004-0000-4C6564676572"
         const val NANO_FTS_SERVICE_UUID = "13d63400-2c97-6004-0000-4c6564676572"
 
