@@ -8,11 +8,14 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 
-class BleGattCallbackFlow: BluetoothGattCallback() {
+class BleGattCallbackFlow : BluetoothGattCallback() {
 
-    private val _gattFlow = MutableSharedFlow<GattCallbackEvent>(replay = 1, extraBufferCapacity = 0)
+    private val _gattFlow =
+        MutableSharedFlow<GattCallbackEvent>(replay = 1, extraBufferCapacity = 0)
     val gattFlow: Flow<GattCallbackEvent>
         get() = _gattFlow
+
+    private var hasDiscoveredService: Boolean = false
 
     private fun pushEvent(event: GattCallbackEvent) {
         runBlocking {
@@ -38,6 +41,7 @@ class BleGattCallbackFlow: BluetoothGattCallback() {
     ) {
         Timber.d("------------- onServicesDiscovered status: $status")
         if (status == BluetoothGatt.GATT_SUCCESS) {
+            hasDiscoveredService = true
             pushEvent(
                 GattCallbackEvent.ServicesDiscovered(gatt.services)
             )
@@ -49,12 +53,15 @@ class BleGattCallbackFlow: BluetoothGattCallback() {
 
     override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
         super.onMtuChanged(gatt, mtu, status)
-        Timber.d("------------ onMtuChanged => MTU new size: $mtu")
-        if (status == BluetoothGatt.GATT_SUCCESS) {
-            pushEvent(GattCallbackEvent.MtuNegociated(mtu - GattInteractor.GATT_HEADER_SIZE))
-        } else {
-            Timber.w("onMtuChanged error with status : $status")
-            pushEvent(GattCallbackEvent.ConnectionState.Disconnected)
+        //Seems that the callback can be reached without calling gatt.requestMtu(...)
+        if (hasDiscoveredService) {
+            Timber.d("------------ onMtuChanged => MTU new size: $mtu")
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                pushEvent(GattCallbackEvent.MtuNegociated(mtu - GattInteractor.GATT_HEADER_SIZE))
+            } else {
+                Timber.w("onMtuChanged error with status : $status")
+                pushEvent(GattCallbackEvent.ConnectionState.Disconnected)
+            }
         }
     }
 
@@ -84,6 +91,11 @@ class BleGattCallbackFlow: BluetoothGattCallback() {
     ) {
         Timber.d("------------- onCharacteristicChanged status: ${characteristic.value.toHexString()}")
         pushEvent(GattCallbackEvent.CharacteristicChanged(characteristic.value))
+    }
+
+    fun clear() {
+        hasDiscoveredService = false
+        _gattFlow.resetReplayCache()
     }
 }
 

@@ -60,6 +60,7 @@ class BleService : Service() {
         listenningJob?.cancel()
         stateMachine?.clear()
         stateMachine = null
+        gattCallback.clear()
 
         stopSelf()
         notify(BleServiceEvent.BleDeviceDisconnected)

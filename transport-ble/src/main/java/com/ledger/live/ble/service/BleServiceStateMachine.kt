@@ -60,6 +60,7 @@ class BleServiceStateMachine(
 
     fun clear() {
         this.isCleared = true
+        _stateMachineFlow.resetReplayCache()
         this.gattInteractor.gatt.close()
         this.gattInteractor.gatt.disconnect()
     }
