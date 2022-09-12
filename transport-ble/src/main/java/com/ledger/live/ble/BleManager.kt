@@ -460,7 +460,7 @@ class BleManager internal constructor(
     }
 
     companion object {
-        private const val SCAN_MATCH_TTL = 3000L
+        private const val SCAN_MATCH_TTL = 5000L
         private const val SCAN_THROTTLE_MS = 1000L
 
         const val NANO_X_SERVICE_UUID = "13D63400-2C97-0004-0000-4C6564676572"
