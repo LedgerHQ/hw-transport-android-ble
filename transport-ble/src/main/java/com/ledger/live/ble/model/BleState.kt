@@ -10,5 +10,5 @@ sealed class BleState {
         val connectedDevice: BleDeviceModel
     ): BleState()
 
-    object Disconnected: BleState()
+    data class Disconnected(val error: BleError? = null): BleState()
 }

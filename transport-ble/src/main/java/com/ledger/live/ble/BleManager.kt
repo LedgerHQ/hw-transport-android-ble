@@ -17,6 +17,7 @@ import com.ledger.live.ble.callback.BleManagerDisconnectionCallback
 import com.ledger.live.ble.callback.BleManagerSendCallback
 import com.ledger.live.ble.extension.fromHexStringToBytes
 import com.ledger.live.ble.model.BleDeviceModel
+import com.ledger.live.ble.model.BleError
 import com.ledger.live.ble.model.BleEvent
 import com.ledger.live.ble.model.BleState
 import com.ledger.live.ble.service.BleService
@@ -32,6 +33,7 @@ import java.util.*
 class BleManager internal constructor(
     private val context: Context
 ) {
+
     private val scope = CoroutineScope(Dispatchers.IO + Job())
 
     private var isScanning: Boolean = false
@@ -231,7 +233,7 @@ class BleManager internal constructor(
     fun connect(
         address: String,
         onConnectSuccess: (BleDeviceModel) -> Unit,
-        onConnectError: (String) -> Unit
+        onConnectError: (BleError) -> Unit
     ) {
         val callback = object : BleManagerConnectionCallback {
             override fun onConnectionSuccess(device: BleDeviceModel) {
@@ -239,8 +241,8 @@ class BleManager internal constructor(
                 onConnectSuccess(device)
             }
 
-            override fun onConnectionError(message: String) {
-                onConnectError(message)
+            override fun onConnectionError(error: BleError) {
+                onConnectError(error)
             }
         }
 
@@ -296,8 +298,8 @@ class BleManager internal constructor(
             val gattServiceIntent = Intent(context, BleService::class.java)
             context.bindService(gattServiceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
         } ?: run {
-            connectionCallback?.onConnectionError("Device not found")
-            _bleEvents.tryEmit(BleEvent.BleError.ConnectionError("Device not found"))
+            connectionCallback?.onConnectionError(BleError.DEVICE_NOT_FOUND)
+            _bleEvents.tryEmit(BleEvent.Error.ConnectionError(BleError.DEVICE_NOT_FOUND))
         }
     }
 
@@ -399,8 +401,8 @@ class BleManager internal constructor(
             bluetoothService?.let { bleService ->
                 if (!bleService.initialize()) {
                     Timber.e("Unable to initialize Bluetooth")
-                    connectionCallback?.onConnectionError("Couldn't initialize the BLE service")
-                    bleService.disconnectService()
+                    connectionCallback?.onConnectionError(BleError.INITIALIZING_FAILED)
+                    bleService.disconnectService(BleError.INITIALIZING_FAILED)
                 } else {
                     bleService.connect(connectedDevice.id)
                     scope.launch {
@@ -411,8 +413,8 @@ class BleManager internal constructor(
                                     _bleState.tryEmit(BleState.Connected(connectedDevice))
                                 }
                                 is BleServiceEvent.BleDeviceDisconnected -> {
-                                    disconnected()
-                                    _bleState.tryEmit(BleState.Disconnected)
+                                    _bleState.tryEmit(BleState.Disconnected(event.error))
+                                    disconnected(event.error)
                                 }
                                 is BleServiceEvent.SuccessSend -> {
                                     _bleEvents.tryEmit(BleEvent.SendingEvent.SendSuccess(event.sendId))
@@ -424,7 +426,7 @@ class BleManager internal constructor(
                                         }
                                 }
                                 is BleServiceEvent.ErrorSend -> {
-                                    _bleEvents.tryEmit(BleEvent.BleError.SendError(event.error))
+                                    _bleEvents.tryEmit(BleEvent.Error.SendError(event.error))
                                     pendingSendRequest.firstOrNull { it.id == event.sendId }
                                         ?.let { callback ->
                                             callback.onError(event.error)
@@ -443,14 +445,22 @@ class BleManager internal constructor(
         }
     }
 
-    private fun disconnected() {
+    private var tmpError: BleError? = null
+    private fun disconnected(error: BleError? = null) {
         Timber.d("BleService disconnected")
         if (bluetoothService?.isBound == true) {
+            tmpError = error
             context.unbindService(serviceConnection)
         } else {
             //Only Call disconnection or error
-            disconnectionCallback?.onDisconnectionSuccess()
-                ?: connectionCallback?.onConnectionError("Device connection lost")
+            if (tmpError == null && error == null) {
+                disconnectionCallback?.onDisconnectionSuccess()
+            } else {
+                val errorToSend = error ?: tmpError
+                connectionCallback?.onConnectionError(errorToSend!!)
+            }
+
+            tmpError = null
             disconnectionCallback = null
             connectionCallback = null
             bluetoothService = null

@@ -1,9 +1,9 @@
 package com.ledger.live.ble.model
 
 sealed class BleEvent {
-    sealed class BleError : BleEvent() {
-        data class SendError(val error: String) : BleEvent()
-        data class ConnectionError(val error: String) : BleEvent()
+    sealed class Error : BleEvent() {
+        data class SendError(val error: String) : Error()
+        data class ConnectionError(val error: BleError) : Error()
     }
 
     sealed class BleStateChange : BleEvent() {

@@ -6,6 +6,7 @@ import android.bluetooth.*
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
+import com.ledger.live.ble.model.BleError
 import com.ledger.live.ble.service.model.BleServiceEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -56,14 +57,14 @@ class BleService : Service() {
         }
     }
 
-    fun disconnectService() {
+    fun disconnectService(bleError: BleError? = null) {
         listenningJob?.cancel()
         stateMachine?.clear()
         stateMachine = null
         gattCallback.clear()
 
         stopSelf()
-        notify(BleServiceEvent.BleDeviceDisconnected)
+        notify(BleServiceEvent.BleDeviceDisconnected(bleError))
     }
 
 
@@ -71,9 +72,8 @@ class BleService : Service() {
         // Previously connected to the given device.
         // Try to reconnect.
         Timber.d("Connect to device address => $address.")
-
         if (bluetoothDeviceAddress != null && address == bluetoothDeviceAddress && stateMachine != null) {
-           stateMachine?.clear()
+            stateMachine?.clear()
         }
 
         val device: BluetoothDevice = bluetoothAdapter.getRemoteDevice(address)
@@ -99,7 +99,7 @@ class BleService : Service() {
             when (it) {
                 is BleServiceStateMachine.BleServiceState.Ready -> {
                     if (isReady == false) {
-                        isReady =  true
+                        isReady = true
                         notify(BleServiceEvent.BleDeviceConnected)
                     }
 
@@ -113,13 +113,12 @@ class BleService : Service() {
                     }
                 }
                 is BleServiceStateMachine.BleServiceState.Error -> {
-                    Timber.e(it.error)
-                    disconnectService()
+                    disconnectService(it.error)
                 }
             }
         }
-        ?.flowOn(Dispatchers.IO)
-        ?.launchIn(scope)
+            ?.flowOn(Dispatchers.IO)
+            ?.launchIn(scope)
     }
 
     private fun notify(event: BleServiceEvent) {
@@ -134,7 +133,7 @@ class BleService : Service() {
     fun sendApdu(apdu: ByteArray): String {
         Timber.d("Send APDU")
         if (bluetoothDeviceAddress == null) {
-            disconnectService()
+            disconnectService(BleError.NO_DEVICE_ADDRESS)
         }
 
         return stateMachine!!.sendApdu(apdu)
@@ -143,5 +142,7 @@ class BleService : Service() {
     companion object {
         internal const val MTU_HANDSHAKE_COMMAND = "0800000000"
         private const val APP_VERSION_COMMAND = "b001000000"
+
+        private const val ERROR_CODE_NO_ERROR = -1
     }
 }
