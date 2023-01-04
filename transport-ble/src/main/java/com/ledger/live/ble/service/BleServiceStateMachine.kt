@@ -3,10 +3,7 @@ package com.ledger.live.ble.service
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattService
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import androidx.annotation.VisibleForTesting
 import com.ledger.live.ble.BleManager
 import com.ledger.live.ble.extension.toHexString
@@ -36,8 +33,8 @@ class BleServiceStateMachine(
     private val bleReceiver = BleReceiver()
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
-    internal lateinit var timeoutJob: Job
-    internal lateinit var pairingCallbackFlow: BlePairingCallbackFlow
+    private lateinit var timeoutJob: Job
+    private lateinit var pairingCallbackFlow: BlePairingCallbackFlow
 
     private val _stateMachineFlow = MutableSharedFlow<BleServiceState>(
         replay = 1,
@@ -116,6 +113,7 @@ class BleServiceStateMachine(
                     }
                     else -> {
                         pushState(BleServiceState.Error(BleError.INTERNAL_STATE))
+                        Timber.e(ERROR_MTU_NEGOTIATED_AND_CHECKED_DIVERGENT)
                     }
                 }
             }
@@ -233,9 +231,13 @@ class BleServiceStateMachine(
             }
         }
     }
-
     var isPaired = false
     var pairing = false
+
+
+    fun isBusy(): Boolean {
+        return bleSender.isBusy()
+    }
 
     @VisibleForTesting
     private fun pushState(state: BleServiceState) {
@@ -258,7 +260,7 @@ class BleServiceStateMachine(
         var deviceService: BleDeviceService? = null
         services.forEach { service ->
             if (service.uuid == BleManager.NANO_X_SERVICE_UUID.toUUID()
-                || service.uuid == BleManager.NANO_FTS_SERVICE_UUID.toUUID()
+                || service.uuid == BleManager.STAX_SERVICE_UUID.toUUID()
             ) {
                 Timber.d("Service UUID ${service.uuid}")
 
@@ -267,15 +269,15 @@ class BleServiceStateMachine(
                 service.characteristics.forEach { characteristic ->
                     when (characteristic.uuid) {
                         BleManager.nanoXWriteWithResponseCharacteristicUUID.toUUID(),
-                        BleManager.nanoFTSWriteWithResponseCharacteristicUUID.toUUID() -> {
+                        BleManager.staxWriteWithResponseCharacteristicUUID.toUUID() -> {
                             bleServiceBuilder.setWriteCharacteristic(characteristic)
                         }
                         BleManager.nanoXWriteWithoutResponseCharacteristicUUID.toUUID(),
-                        BleManager.nanoFTSWriteWithoutResponseCharacteristicUUID.toUUID() -> {
+                        BleManager.staxWriteWithoutResponseCharacteristicUUID.toUUID() -> {
                             bleServiceBuilder.setWriteNoAnswerCharacteristic(characteristic)
                         }
                         BleManager.nanoXNotifyCharacteristicUUID.toUUID(),
-                        BleManager.nanoFTSNotifyCharacteristicUUID.toUUID() -> {
+                        BleManager.staxNotifyCharacteristicUUID.toUUID() -> {
                             bleServiceBuilder.setNotifyCharacteristic(characteristic)
                         }
                     }

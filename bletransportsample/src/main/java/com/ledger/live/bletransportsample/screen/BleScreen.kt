@@ -1,6 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
-package com.ledger.live.bletransportsample.screen.scan
+package com.ledger.live.bletransportsample.screen
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.*
@@ -8,38 +6,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.ledger.live.bletransportsample.R
+import com.ledger.live.bletransportsample.screen.model.BleUiState
 
 @SuppressLint("MissingPermission")
 @Composable
-fun ScanScreen(
-    scanViewModel: ScanViewModel
-) {
-    val uiState: BleUiState by scanViewModel.uiState.collectAsState(initial = BleUiState.Idle)
-    Scan(
-        uiState = uiState,
-        toggleScan = { scanViewModel.toggleScan() },
-        connectknownDevice = { scanViewModel.connectNanoX() },
-        onDeviceClick = { deviceId: String -> scanViewModel.connectToDevice(deviceId) },
-        sendSmallApdu = { scanViewModel.sendSmallApdu() },
-        sendBigApdu = { scanViewModel.sendBigApdu() },
-        disconnect = { scanViewModel.disconnect() }
-    )
-
-}
-
-@SuppressLint("MissingPermission")
-@Composable
-fun Scan(
+fun BleScreen(
     uiState: BleUiState,
     toggleScan: () -> Unit,
-    connectknownDevice: () -> Unit,
     onDeviceClick: (String) -> Unit,
     sendSmallApdu: () -> Unit,
     sendBigApdu: () -> Unit,
@@ -78,13 +56,6 @@ fun Scan(
                         }
                     }
                 } else {
-
-                    Button(
-                        onClick = { connectknownDevice() }
-                    ) {
-                        Text(text = "Connect to Nano X 7B95")
-                    }
-
                     Text(text = "Clic on scan for finding devices")
                 }
             }
@@ -110,10 +81,9 @@ fun Scan(
             //TODO
         }
     }
-
-
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScannedDeviceItem(
     title: String,
@@ -134,5 +104,4 @@ fun ScannedDeviceItem(
             Text(text = title)
         }
     }
-
 }

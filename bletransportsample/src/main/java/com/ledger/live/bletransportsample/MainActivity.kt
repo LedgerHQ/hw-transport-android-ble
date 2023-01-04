@@ -11,12 +11,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
-import com.ledger.live.bletransportsample.screen.scan.ScanScreen
-import com.ledger.live.bletransportsample.screen.scan.ScanViewModel
+import com.ledger.live.bletransportsample.screen.callback.CallbackScreen
+import com.ledger.live.bletransportsample.screen.callback.CallbackViewModel
+import com.ledger.live.bletransportsample.screen.flow.FlowScreen
+import com.ledger.live.bletransportsample.screen.flow.FlowViewModel
 import com.ledger.live.bletransportsample.ui.theme.LiveTransportBleTheme
 import timber.log.Timber
-import timber.log.Timber.*
-
+import timber.log.Timber.DebugTree
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,7 +27,9 @@ class MainActivity : ComponentActivity() {
             Timber.plant(DebugTree())
         }
 
-        val viewModel = ScanViewModel.ScanViewModelFactory(this).create(ScanViewModel::class.java)
+        val callbackViewModel = CallbackViewModel.CallbackViewModelFactory(this).create(CallbackViewModel::class.java)
+        val flowViewModel = FlowViewModel.FlowViewModelFactory(this).create(FlowViewModel::class.java)
+
         setContent {
             LiveTransportBleTheme {
                 // A surface container using the 'background' color from the theme
@@ -34,7 +37,11 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    ScanScreen(viewModel)
+                    // For Callback
+                    //CallbackScreen(callbackViewModel)
+
+                    // For Flow usage
+                    FlowScreen(flowViewModel)
                 }
             }
         }
@@ -53,6 +60,6 @@ class ErrorTree : Timber.Tree() {
 @Composable
 fun DefaultPreview() {
     LiveTransportBleTheme {
-        ScanScreen(ScanViewModel.ScanViewModelFactory(LocalContext.current).create(ScanViewModel::class.java))
+        CallbackScreen(CallbackViewModel.CallbackViewModelFactory(LocalContext.current).create(CallbackViewModel::class.java))
     }
 }

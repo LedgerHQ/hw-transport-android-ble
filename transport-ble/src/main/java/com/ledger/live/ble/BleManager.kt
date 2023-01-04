@@ -180,10 +180,10 @@ class BleManager internal constructor(
                 .build()
         )
 
-        //Filter Faststack service
+        //Filter Stax service
         filters.add(
             ScanFilter.Builder()
-                .setServiceUuid(ParcelUuid(UUID.fromString(NANO_FTS_SERVICE_UUID)))
+                .setServiceUuid(ParcelUuid(UUID.fromString(STAX_SERVICE_UUID)))
                 .build()
         )
 
@@ -353,7 +353,15 @@ class BleManager internal constructor(
             || disconnectingDeferred?.isCompleted == true
             || disconnectingDeferred?.isCancelled == true
         ) {
-            if (bluetoothService != null && bluetoothService!!.isBound) {
+            if (bluetoothService != null
+                && bluetoothService!!.isBound
+                && bluetoothService!!.isBusy()
+            ) {
+                scope.launch {
+                    delay(500L)
+                    internalDisconnect()
+                }
+            } else if (bluetoothService != null && bluetoothService!!.isBound) {
                 disconnectingDeferred = CompletableDeferred()
                 context.unbindService(serviceConnection)
                 disconnectingDeferred!!.await()
@@ -362,9 +370,9 @@ class BleManager internal constructor(
     }
 
     fun send(
-        apdu: ByteArray,
+        apduHex: String,
     ) {
-        bluetoothService?.sendApdu(apdu) ?: run {
+        bluetoothService?.sendApdu(apduHex.fromHexStringToBytes()) ?: run {
             throw IllegalStateException("Bluetooth service not connected, please use connect before")
         }
     }
@@ -474,17 +482,15 @@ class BleManager internal constructor(
         private const val SCAN_THROTTLE_MS = 1000L
 
         const val NANO_X_SERVICE_UUID = "13D63400-2C97-0004-0000-4C6564676572"
-        const val NANO_FTS_SERVICE_UUID = "13d63400-2c97-6004-0000-4c6564676572"
-
         const val nanoXNotifyCharacteristicUUID = "13d63400-2c97-0004-0001-4c6564676572"
         const val nanoXWriteWithResponseCharacteristicUUID = "13d63400-2c97-0004-0002-4c6564676572"
         const val nanoXWriteWithoutResponseCharacteristicUUID =
             "13d63400-2c97-0004-0003-4c6564676572"
 
-        const val nanoFTSNotifyCharacteristicUUID = "13d63400-2c97-6004-0001-4c6564676572"
-        const val nanoFTSWriteWithResponseCharacteristicUUID =
-            "13d63400-2c97-6004-0002-4c6564676572"
-        const val nanoFTSWriteWithoutResponseCharacteristicUUID =
+        const val STAX_SERVICE_UUID = "13d63400-2c97-6004-0000-4c6564676572"
+        const val staxNotifyCharacteristicUUID = "13d63400-2c97-6004-0001-4c6564676572"
+        const val staxWriteWithResponseCharacteristicUUID = "13d63400-2c97-6004-0002-4c6564676572"
+        const val staxWriteWithoutResponseCharacteristicUUID =
             "13d63400-2c97-6004-0003-4c6564676572"
     }
 }

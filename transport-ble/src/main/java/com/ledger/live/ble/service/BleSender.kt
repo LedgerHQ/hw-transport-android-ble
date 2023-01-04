@@ -77,6 +77,9 @@ class BleSender(
         isInitialized = true
     }
 
+    fun isBusy(): Boolean =
+        pendingApdu.isEmpty() && commandQueue.isEmpty() && pendingCommand != null
+
     companion object {
         fun generateId(deviceName: String): String {
             return "${deviceName}_send_${Date().time}"

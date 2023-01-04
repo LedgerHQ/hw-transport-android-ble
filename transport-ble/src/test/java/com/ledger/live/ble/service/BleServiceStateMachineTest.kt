@@ -10,6 +10,7 @@ import com.ledger.live.ble.BleManager
 import com.ledger.live.ble.extension.fromHexStringToBytes
 import com.ledger.live.ble.extension.toHexString
 import com.ledger.live.ble.extension.toUUID
+import com.ledger.live.ble.model.BleError
 import com.ledger.live.ble.service.model.GattCallbackEvent
 import io.mockk.every
 import io.mockk.justRun
@@ -36,9 +37,13 @@ class BleServiceStateMachineTest {
     @BeforeEach
     fun setup() {
         val device: BluetoothDevice = mockk()
-
         every { device.connectGatt(any(), any(), any()) } returns gatt
+        every { gatt.writeCharacteristic(any()) } returns true
+        every { gatt.requestConnectionPriority(any()) } returns true
+
         val mockContext: Context = mockk()
+        every { mockContext.registerReceiver(any(), any()) } returns mockk()
+        every { mockContext.unregisterReceiver(any()) } returns Unit
 
         mockedFlow = MutableSharedFlow()
         every { callbackFlow.gattFlow } returns mockedFlow
@@ -54,7 +59,6 @@ class BleServiceStateMachineTest {
             every { writeCharacteristic } returns mockCharacteristic
             every { notifyCharacteristic } returns mockCharacteristic
         }
-        every { gatt.writeCharacteristic(any()) } returns true
 
         stateMachine.mtuSize = mtuSize
     }
@@ -75,7 +79,7 @@ class BleServiceStateMachineTest {
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleServiceStateMachine.ERROR_TIMEOUT),
+                        BleServiceStateMachine.BleServiceState.Error(BleError.CONNECTION_TIMEOUT),
                         awaitItem()
                     )
                 }
@@ -115,7 +119,7 @@ class BleServiceStateMachineTest {
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleServiceStateMachine.ERROR_WRONG_STATE_FOR_SERVICES_DISCOVERED),
+                        BleServiceStateMachine.BleServiceState.Error(BleError.INTERNAL_STATE),
                         awaitItem()
                     )
                 }
@@ -168,7 +172,7 @@ class BleServiceStateMachineTest {
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleServiceStateMachine.ERROR_NO_SERVICES_FOUND),
+                        BleServiceStateMachine.BleServiceState.Error(BleError.SERVICE_NOT_FOUND),
                         awaitItem()
                     )
                 }
@@ -190,7 +194,7 @@ class BleServiceStateMachineTest {
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleServiceStateMachine.ERROR_WRONG_STATE_FOR_MTU_NEGOTIATED),
+                        BleServiceStateMachine.BleServiceState.Error(BleError.INTERNAL_STATE),
                         awaitItem()
                     )
                 }
@@ -243,7 +247,7 @@ class BleServiceStateMachineTest {
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleServiceStateMachine.ERROR_WRONG_STATE_FOR_WRITE_DESCRIPTOR_ACK),
+                        BleServiceStateMachine.BleServiceState.Error(BleError.INTERNAL_STATE),
                         awaitItem()
                     )
                 }
@@ -282,7 +286,7 @@ class BleServiceStateMachineTest {
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleServiceStateMachine.ERROR_WRONG_STATE_FOR_CHARACTERISTIC_CHANGED),
+                        BleServiceStateMachine.BleServiceState.Error(BleError.INTERNAL_STATE),
                         awaitItem()
                     )
                 }

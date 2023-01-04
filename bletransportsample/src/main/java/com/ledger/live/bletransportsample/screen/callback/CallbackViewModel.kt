@@ -1,67 +1,27 @@
-package com.ledger.live.bletransportsample.screen.scan
+package com.ledger.live.bletransportsample.screen.callback
 
 import android.annotation.SuppressLint
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewModelScope
 import com.ledger.live.ble.BleManager
 import com.ledger.live.ble.BleManagerFactory
-import com.ledger.live.ble.model.BleState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import com.ledger.live.bletransportsample.screen.model.BleUiState
+import com.ledger.live.bletransportsample.screen.model.UiDevice
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 
 @SuppressLint("MissingPermission")
-class ScanViewModel(
+class CallbackViewModel(
     context: Context,
 ) : ViewModel() {
 
-    private var listeningJob: Job? = null
     private var isScanning: Boolean = false
     private val _uiState: MutableSharedFlow<BleUiState> = MutableSharedFlow(extraBufferCapacity = 1)
     val uiState: Flow<BleUiState>
         get() = _uiState
 
     private val bleManager: BleManager = BleManagerFactory.newInstance(context)
-
-    init {
-        listeningJob = bleManager.bleState
-            .onEach {
-                Timber.d("[$this] new state => $it")
-            }
-            .onEach(this::handleState)
-            .flowOn(Dispatchers.IO)
-            .launchIn(viewModelScope)
-    }
-
-    override fun onCleared() {
-        Timber.d("On cleared called")
-        super.onCleared()
-        listeningJob?.cancel()
-    }
-
-    private fun handleState(state: BleState) {
-        when (state) {
-            is BleState.Idle,
-            is BleState.Disconnected -> {
-                _uiState.tryEmit(BleUiState.Idle)
-            }
-            is BleState.Scanning -> {
-                val scanningState = BleUiState.Scanning(
-                    devices = state.scannedDevices.map { UiDevice(it.id, it.name) }
-                )
-                _uiState.tryEmit(scanningState)
-            }
-   /*         is BleState.Connected -> {
-                Timber.d("connected")
-                val device = state.connectedDevice
-                _uiState.tryEmit(BleUiState.Connected(UiDevice(device.id, device.name)))
-            }*/
-            else -> {}
-        }
-    }
 
     fun toggleScan() {
         if (isScanning) {
@@ -71,6 +31,7 @@ class ScanViewModel(
         } else {
             isScanning = true
             bleManager.startScanning {
+                Timber.d("Scanned device callback $it")
                 val scanningState = BleUiState.Scanning(
                     devices = it.map { device -> UiDevice(device.id, device.name) }
                 )
@@ -101,13 +62,6 @@ class ScanViewModel(
                 _uiState.tryEmit(BleUiState.Connected(UiDevice(device.id, device.name)))
             }
         )
-    }
-
-    fun connectNanoX() {
-        connectToDevice("DE:F1:9B:AA:53:4C")
-        connectToDevice("DE:F1:9B:AA:53:4C")
-        connectToDevice("DE:F1:9B:AA:53:4C")
-        connectToDevice("DE:F1:9B:AA:53:4C")
     }
 
     fun sendSmallApdu() {
@@ -147,25 +101,9 @@ class ScanViewModel(
         }
     }
 
-    class ScanViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
+    class CallbackViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return ScanViewModel(context) as T
+            return CallbackViewModel(context) as T
         }
     }
 }
-
-sealed class BleUiState {
-    object Idle : BleUiState()
-    data class Scanning(
-        val devices: List<UiDevice> = emptyList(),
-    ) : BleUiState()
-
-    data class Connected(
-        val device: UiDevice
-    ) : BleUiState()
-}
-
-data class UiDevice(
-    val id: String,
-    val name: String
-)

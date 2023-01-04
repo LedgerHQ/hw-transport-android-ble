@@ -84,39 +84,41 @@ class BleService : Service() {
             gattCallback,
             address,
             device
-        )
-        observeStateMachine()
-        stateMachine?.build(this.applicationContext)
-        bluetoothDeviceAddress = address
+        ).apply {
+            observeStateMachine()
+            this.build(this@BleService.applicationContext)
+        }
 
+        bluetoothDeviceAddress = address
         return true
     }
 
     var isReady = false
     private fun observeStateMachine() {
-        listenningJob = stateMachine?.stateFlow?.onEach {
-            Timber.d("State changed >>>> $it")
-            when (it) {
-                is BleServiceStateMachine.BleServiceState.Ready -> {
-                    if (isReady == false) {
-                        isReady = true
-                        notify(BleServiceEvent.BleDeviceConnected)
-                    }
+        listenningJob = stateMachine?.stateFlow
+            ?.onEach {
+                Timber.d("State changed >>>> $it")
+                when (it) {
+                    is BleServiceStateMachine.BleServiceState.Ready -> {
+                        if (!isReady) {
+                            isReady = true
+                            notify(BleServiceEvent.BleDeviceConnected)
+                        }
 
-                    it.answer?.let { answer ->
-                        notify(
-                            BleServiceEvent.SendAnswer(
-                                sendId = answer.id,
-                                answer = answer.answer
+                        it.answer?.let { answer ->
+                            notify(
+                                BleServiceEvent.SendAnswer(
+                                    sendId = answer.id,
+                                    answer = answer.answer
+                                )
                             )
-                        )
+                        }
                     }
-                }
-                is BleServiceStateMachine.BleServiceState.Error -> {
-                    disconnectService(it.error)
+                    is BleServiceStateMachine.BleServiceState.Error -> {
+                        disconnectService(it.error)
+                    }
                 }
             }
-        }
             ?.flowOn(Dispatchers.IO)
             ?.launchIn(scope)
     }
@@ -138,6 +140,8 @@ class BleService : Service() {
 
         return stateMachine!!.sendApdu(apdu)
     }
+
+    fun isBusy(): Boolean = stateMachine?.isBusy() ?: false
 
     companion object {
         internal const val MTU_HANDSHAKE_COMMAND = "0800000000"
