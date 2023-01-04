@@ -1,0 +1,36 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        jcenter()
+       /* maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/LedgerHQ/hw-transport-android-ble")
+
+            def buildProperties = new Properties()
+            file("github.properties").withInputStream {
+                stream -> buildProperties.load(stream)
+            }
+            //Add the credentials in your github.properties file
+            credentials {
+                username = buildProperties["ghp.usr"]
+                password = buildProperties["ghp.key"]
+            }
+        }*/
+        maven {
+            name = "Jitpack"
+            url 'https://jitpack.io'
+        }
+    }
+}
+rootProject.name = "LiveTransportBle"
+include ':transport-ble'
+include ':bletransportsample'
