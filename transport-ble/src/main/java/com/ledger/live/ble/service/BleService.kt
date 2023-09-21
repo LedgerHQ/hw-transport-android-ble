@@ -117,6 +117,13 @@ class BleService : Service() {
                     is BleServiceStateMachine.BleServiceState.Error -> {
                         disconnectService(it.error)
                     }
+
+                    BleServiceStateMachine.BleServiceState.CheckingMtu -> TODO()
+                    BleServiceStateMachine.BleServiceState.Created -> TODO()
+                    BleServiceStateMachine.BleServiceState.NegotiatingMtu -> TODO()
+                    BleServiceStateMachine.BleServiceState.WaitingNotificationEnable -> TODO()
+                    is BleServiceStateMachine.BleServiceState.WaitingResponse -> TODO()
+                    BleServiceStateMachine.BleServiceState.WaitingServices -> TODO()
                 }
             }
             ?.flowOn(Dispatchers.IO)
