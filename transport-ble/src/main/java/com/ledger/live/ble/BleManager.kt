@@ -272,7 +272,6 @@ class BleManager internal constructor(
         }
     }
 
-    @Synchronized
     private suspend fun internalConnect(
         address: String,
         callback: BleManagerConnectionCallback? = null
@@ -347,7 +346,6 @@ class BleManager internal constructor(
 
     private var disconnectingDeferred: CompletableDeferred<Boolean>? = null
 
-    @Synchronized
     private suspend fun internalDisconnect() {
         Timber.d("internal Disconnect")
         if (disconnectingDeferred == null
