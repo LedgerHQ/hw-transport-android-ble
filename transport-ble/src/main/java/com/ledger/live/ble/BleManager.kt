@@ -1,7 +1,9 @@
 package com.ledger.live.ble
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
@@ -10,8 +12,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Build
 import android.os.IBinder
 import android.os.ParcelUuid
+import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import com.ledger.live.ble.callback.BleManagerConnectionCallback
 import com.ledger.live.ble.callback.BleManagerDisconnectionCallback
 import com.ledger.live.ble.callback.BleManagerSendCallback
@@ -55,7 +60,7 @@ class BleManager internal constructor(
         context.getSystemService(BluetoothManager::class.java).adapter
     }
 
-    private val bluetoothScanner by lazy {
+    private val bluetoothScanner: BluetoothLeScanner? by lazy {
         bluetoothAdapter.bluetoothLeScanner
     }
 
@@ -194,7 +199,7 @@ class BleManager internal constructor(
             .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
 
         val scanSettings = builder.build()
-        bluetoothScanner.startScan(filters, scanSettings, scanCallback)
+        bluetoothScanner?.startScan(filters, scanSettings, scanCallback)
 
         //Expose scanned device list every second
         if (pollingJob == null) {
@@ -219,7 +224,7 @@ class BleManager internal constructor(
         Timber.d("Stop Scanning")
         pollingJob?.cancel()
         pollingJob = null
-        bluetoothScanner.stopScan(scanCallback)
+        bluetoothScanner?.stopScan(scanCallback)
         isScanning = false
     }
 
@@ -472,6 +477,27 @@ class BleManager internal constructor(
             bluetoothService = null
             isConnected = false
             disconnectingDeferred?.complete(true)
+        }
+    }
+
+    fun isEnabled(): Boolean = bluetoothAdapter.isEnabled
+
+    fun isPermissionGranted(): Boolean {
+        val locationPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PermissionChecker.PERMISSION_GRANTED
+        return locationPermission && if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_SCAN,
+            ) == PermissionChecker.PERMISSION_GRANTED
+                    && ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT,
+            ) == PermissionChecker.PERMISSION_GRANTED
+        } else {
+            true
         }
     }
 
