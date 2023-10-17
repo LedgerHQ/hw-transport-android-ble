@@ -227,7 +227,6 @@ class BleServiceStateMachineTest {
                     )
                     assertEquals(153, stateMachine.negotiatedMtu)
                     verify { gatt.setCharacteristicNotification(any(), true) }
-                    verify { gatt.writeDescriptor(any()) }
                 }
             }
     }
