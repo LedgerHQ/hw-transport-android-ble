@@ -486,11 +486,7 @@ class BleManager internal constructor(
     fun isEnabled(): Boolean = bluetoothAdapter.isEnabled
 
     fun isPermissionGranted(): Boolean {
-        val locationPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == PermissionChecker.PERMISSION_GRANTED
-        return locationPermission && if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.BLUETOOTH_SCAN,
