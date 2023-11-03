@@ -21,18 +21,19 @@ import com.ledger.live.ble.callback.BleManagerConnectionCallback
 import com.ledger.live.ble.callback.BleManagerDisconnectionCallback
 import com.ledger.live.ble.callback.BleManagerSendCallback
 import com.ledger.live.ble.extension.fromHexStringToBytes
+import com.ledger.live.ble.model.BleDevice
 import com.ledger.live.ble.model.BleDeviceModel
 import com.ledger.live.ble.model.BleError
 import com.ledger.live.ble.model.BleEvent
 import com.ledger.live.ble.model.BleState
 import com.ledger.live.ble.service.BleService
 import com.ledger.live.ble.service.model.BleServiceEvent
+import java.util.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import timber.log.Timber
-import java.util.*
 
 @SuppressLint("MissingPermission")
 class BleManager internal constructor(
@@ -45,7 +46,7 @@ class BleManager internal constructor(
     private val _bleState = MutableSharedFlow<BleState>(
         replay = 1,
         onBufferOverflow = BufferOverflow.DROP_LATEST,
-        extraBufferCapacity = 10
+        extraBufferCapacity = 10,
     )
 
     val bleState: Flow<BleState>
@@ -127,14 +128,16 @@ class BleManager internal constructor(
         val rssi = result.rssi
         val uuids = getServiceUUIDsList(result)
         val name = device.name
+        val serviceId = uuids.first().toString()
 
         return if (name != null && uuids.isNotEmpty()) {
             Timber.d("Scan result device => \n id: ${device.address} \n name: $name \n serviceId : ${uuids.first()}")
             BleDeviceModel(
                 id = device.address,
                 name = name,
-                serviceId = uuids.first().toString(),
-                rssi = rssi
+                serviceId = serviceId,
+                device = serviceId.toDeviceModel(),
+                rssi = rssi,
             )
         } else null
     }
@@ -182,14 +185,14 @@ class BleManager internal constructor(
         filters.add(
             ScanFilter.Builder()
                 .setServiceUuid(ParcelUuid(UUID.fromString(NANO_X_SERVICE_UUID)))
-                .build()
+                .build(),
         )
 
         //Filter Stax service
         filters.add(
             ScanFilter.Builder()
                 .setServiceUuid(ParcelUuid(UUID.fromString(STAX_SERVICE_UUID)))
-                .build()
+                .build(),
         )
 
         scannedDevices = mutableListOf()
@@ -293,10 +296,12 @@ class BleManager internal constructor(
             ?: bluetoothAdapter.bondedDevices.firstOrNull {
                 it.address == address
             }?.let {
+                val serviceId = it.uuids?.first()?.uuid.toString()
                 BleDeviceModel(
                     id = it.address,
                     name = it.name,
-                    serviceId = it.uuids?.first()?.uuid.toString(),
+                    serviceId = serviceId,
+                    device = serviceId.toDeviceModel(),
                 )
             }
 
@@ -397,8 +402,8 @@ class BleManager internal constructor(
             BleManagerSendCallback(
                 id = id,
                 onSuccess = onSuccess,
-                onError = onError
-            )
+                onError = onError,
+            ),
         )
     }
 
@@ -426,19 +431,23 @@ class BleManager internal constructor(
                                     connectionCallback?.onConnectionSuccess(connectedDevice)
                                     _bleState.tryEmit(BleState.Connected(connectedDevice))
                                 }
+
                                 is BleServiceEvent.BleDeviceDisconnected -> {
                                     _bleState.tryEmit(BleState.Disconnected(event.error))
                                     disconnected(event.error)
                                 }
+
                                 is BleServiceEvent.SuccessSend -> {
                                     _bleEvents.tryEmit(BleEvent.SendingEvent.SendSuccess(event.sendId))
                                 }
+
                                 is BleServiceEvent.SendAnswer -> {
                                     pendingSendRequest.firstOrNull { it.id == event.sendId }
                                         ?.let { callback ->
                                             callback.onSuccess(event.answer)
                                         }
                                 }
+
                                 is BleServiceEvent.ErrorSend -> {
                                     _bleEvents.tryEmit(BleEvent.Error.SendError(event.error))
                                     pendingSendRequest.firstOrNull { it.id == event.sendId }
@@ -446,6 +455,7 @@ class BleManager internal constructor(
                                             callback.onError(event.error)
                                         }
                                 }
+
                                 else -> Timber.d("Event not handle $event")
                             }
                         }
@@ -516,4 +526,15 @@ class BleManager internal constructor(
         const val staxWriteWithoutResponseCharacteristicUUID =
             "13d63400-2c97-6004-0003-4c6564676572"
     }
+<<<<<<< HEAD
 }
+=======
+
+    private fun String.toDeviceModel(): BleDevice =
+        when {
+            equals(NANO_X_SERVICE_UUID, ignoreCase = true) -> BleDevice.NANOX
+            equals(STAX_SERVICE_UUID, ignoreCase = true) -> BleDevice.STAX
+            else -> BleDevice.UNKNOWN
+        }
+}
+>>>>>>> 90a416c ([DSDK-72] Update code to escalate device model)
