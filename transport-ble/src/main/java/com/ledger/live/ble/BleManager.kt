@@ -12,6 +12,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelUuid
@@ -509,6 +510,8 @@ class BleManager internal constructor(
             true
         }
     }
+
+    fun isBleSupported(): Boolean = context.packageManager.run { hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) }
 
     companion object {
         private const val SCAN_MATCH_TTL = 5000L
