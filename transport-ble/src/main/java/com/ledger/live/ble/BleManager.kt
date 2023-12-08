@@ -233,6 +233,7 @@ class BleManager internal constructor(
         pollingJob = null
         bluetoothScanner?.stopScan(scanCallback)
         isScanning = false
+        _bleState.tryEmit(BleState.Idle)
     }
 
     private var connectionCallback: BleManagerConnectionCallback? = null
@@ -422,7 +423,7 @@ class BleManager internal constructor(
                 if (!bleService.initialize()) {
                     Timber.e("Unable to initialize Bluetooth")
                     connectionCallback?.onConnectionError(BleError.INITIALIZING_FAILED)
-                    bleService.disconnectService(BleError.INITIALIZING_FAILED)
+                    bleService.disconnectService(BleServiceEvent.BleDeviceDisconnected(BleError.INITIALIZING_FAILED))
                 } else {
                     bleService.connect(connectedDevice.id)
                     scope.launch {
@@ -455,6 +456,10 @@ class BleManager internal constructor(
                                         ?.let { callback ->
                                             callback.onError(event.error)
                                         }
+                                }
+
+                                is BleServiceEvent.BleServiceDisconnected ->{
+                                    _bleState.tryEmit(BleState.Idle)
                                 }
 
                                 else -> Timber.d("Event not handle $event")
@@ -537,7 +542,7 @@ class BleManager internal constructor(
         when {
             equals(NANO_X_SERVICE_UUID, ignoreCase = true) -> BleDevice.NANOX
             equals(STAX_SERVICE_UUID, ignoreCase = true) -> BleDevice.STAX
-            else -> BleDevice.UNKNOWN
+            else -> { throw IllegalStateException("$this is not an known uuid")}
         }
 }
 >>>>>>> 90a416c ([DSDK-72] Update code to escalate device model)
