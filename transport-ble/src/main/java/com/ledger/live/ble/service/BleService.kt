@@ -33,6 +33,7 @@ class BleService : Service() {
     override fun onUnbind(intent: Intent?): Boolean {
         isBound = false
         Timber.d("Unbind service")
+        disconnectService(BleServiceEvent.BleDeviceDisconnected(error = null))
         disconnectService(BleServiceEvent.BleServiceDisconnected)
         return super.onUnbind(intent)
     }
