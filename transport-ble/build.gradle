@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    buildToolsVersion '32.0.0'
+    namespace = "com.ledger.live.ble"
     compileSdk 32
 
     defaultConfig {
@@ -30,7 +30,6 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
-        useIR = true
     }
 }
 
@@ -62,7 +61,7 @@ dependencies {
 
 task sourceJar(type: Jar) {
     from android.sourceSets.main.java.srcDirs
-    classifier "sources"
+    archiveClassifier.set("sources")
 }
 
 publishing {

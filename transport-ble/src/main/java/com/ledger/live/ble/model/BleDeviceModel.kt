@@ -7,6 +7,7 @@ data class BleDeviceModel(
     val name: String,
     val serviceId: String? = null,
     val rssi: Int = 0,
+    val device: BleDevice,
 ) {
     val timestamp: Long = Date().time
 }

@@ -33,7 +33,8 @@ class BleService : Service() {
     override fun onUnbind(intent: Intent?): Boolean {
         isBound = false
         Timber.d("Unbind service")
-        disconnectService()
+        disconnectService(BleServiceEvent.BleDeviceDisconnected(error = null))
+        disconnectService(BleServiceEvent.BleServiceDisconnected)
         return super.onUnbind(intent)
     }
 
@@ -57,16 +58,15 @@ class BleService : Service() {
         }
     }
 
-    fun disconnectService(bleError: BleError? = null) {
+    fun disconnectService(event: BleServiceEvent) {
         listenningJob?.cancel()
         stateMachine?.clear()
         stateMachine = null
         gattCallback.clear()
 
         stopSelf()
-        notify(BleServiceEvent.BleDeviceDisconnected(bleError))
+        notify(event)
     }
-
 
     fun connect(address: String): Boolean {
         // Previously connected to the given device.
@@ -80,11 +80,12 @@ class BleService : Service() {
 
         // We want to directly connect to the device, so we are setting the autoConnect
         // parameter to false.
-        stateMachine = BleServiceStateMachine(
+        BleServiceStateMachine(
             gattCallback,
             address,
             device
         ).apply {
+            stateMachine = this
             observeStateMachine()
             this.build(this@BleService.applicationContext)
         }
@@ -115,8 +116,15 @@ class BleService : Service() {
                         }
                     }
                     is BleServiceStateMachine.BleServiceState.Error -> {
-                        disconnectService(it.error)
+                        disconnectService(BleServiceEvent.BleDeviceDisconnected(it.error))
                     }
+
+                    BleServiceStateMachine.BleServiceState.CheckingMtu -> {}
+                    BleServiceStateMachine.BleServiceState.Created -> {}
+                    BleServiceStateMachine.BleServiceState.NegotiatingMtu -> {}
+                    BleServiceStateMachine.BleServiceState.WaitingNotificationEnable -> {}
+                    is BleServiceStateMachine.BleServiceState.WaitingResponse -> {}
+                    BleServiceStateMachine.BleServiceState.WaitingServices -> {}
                 }
             }
             ?.flowOn(Dispatchers.IO)
@@ -135,7 +143,7 @@ class BleService : Service() {
     fun sendApdu(apdu: ByteArray): String {
         Timber.d("Send APDU")
         if (bluetoothDeviceAddress == null) {
-            disconnectService(BleError.NO_DEVICE_ADDRESS)
+            disconnectService(BleServiceEvent.BleDeviceDisconnected(BleError.NO_DEVICE_ADDRESS))
         }
 
         return stateMachine!!.sendApdu(apdu)

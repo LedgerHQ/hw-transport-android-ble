@@ -1,7 +1,9 @@
 package com.ledger.live.ble
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
@@ -10,24 +12,29 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.IBinder
 import android.os.ParcelUuid
+import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import com.ledger.live.ble.callback.BleManagerConnectionCallback
 import com.ledger.live.ble.callback.BleManagerDisconnectionCallback
 import com.ledger.live.ble.callback.BleManagerSendCallback
 import com.ledger.live.ble.extension.fromHexStringToBytes
+import com.ledger.live.ble.model.BleDevice
 import com.ledger.live.ble.model.BleDeviceModel
 import com.ledger.live.ble.model.BleError
 import com.ledger.live.ble.model.BleEvent
 import com.ledger.live.ble.model.BleState
 import com.ledger.live.ble.service.BleService
 import com.ledger.live.ble.service.model.BleServiceEvent
+import java.util.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import timber.log.Timber
-import java.util.*
 
 @SuppressLint("MissingPermission")
 class BleManager internal constructor(
@@ -40,7 +47,7 @@ class BleManager internal constructor(
     private val _bleState = MutableSharedFlow<BleState>(
         replay = 1,
         onBufferOverflow = BufferOverflow.DROP_LATEST,
-        extraBufferCapacity = 10
+        extraBufferCapacity = 10,
     )
 
     val bleState: Flow<BleState>
@@ -55,7 +62,7 @@ class BleManager internal constructor(
         context.getSystemService(BluetoothManager::class.java).adapter
     }
 
-    private val bluetoothScanner by lazy {
+    private val bluetoothScanner: BluetoothLeScanner? by lazy {
         bluetoothAdapter.bluetoothLeScanner
     }
 
@@ -122,14 +129,16 @@ class BleManager internal constructor(
         val rssi = result.rssi
         val uuids = getServiceUUIDsList(result)
         val name = device.name
+        val serviceId = uuids.first().toString()
 
         return if (name != null && uuids.isNotEmpty()) {
             Timber.d("Scan result device => \n id: ${device.address} \n name: $name \n serviceId : ${uuids.first()}")
             BleDeviceModel(
                 id = device.address,
                 name = name,
-                serviceId = uuids.first().toString(),
-                rssi = rssi
+                serviceId = serviceId,
+                device = serviceId.toDeviceModel(),
+                rssi = rssi,
             )
         } else null
     }
@@ -177,25 +186,27 @@ class BleManager internal constructor(
         filters.add(
             ScanFilter.Builder()
                 .setServiceUuid(ParcelUuid(UUID.fromString(NANO_X_SERVICE_UUID)))
-                .build()
+                .build(),
         )
 
         //Filter Stax service
         filters.add(
             ScanFilter.Builder()
                 .setServiceUuid(ParcelUuid(UUID.fromString(STAX_SERVICE_UUID)))
-                .build()
+                .build(),
         )
 
         scannedDevices = mutableListOf()
 
-        val scanSettings = ScanSettings.Builder()
-            .setNumOfMatches(ScanSettings.MATCH_NUM_FEW_ADVERTISEMENT) // Add for being sure to have total informations
-            .setMatchMode(ScanSettings.MATCH_MODE_STICKY)// Same need higher signal for being listed
-            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
-            .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH or ScanSettings.CALLBACK_TYPE_MATCH_LOST)
-            .build()
-        bluetoothScanner.startScan(filters, scanSettings, scanCallback)
+        val builder =
+            ScanSettings.Builder()
+                .setNumOfMatches(ScanSettings.MATCH_NUM_FEW_ADVERTISEMENT) // Add for being sure to have total informations
+                .setMatchMode(ScanSettings.MATCH_MODE_STICKY)// Same need higher signal for being listed
+                .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+                .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH or ScanSettings.CALLBACK_TYPE_MATCH_LOST)
+
+        val scanSettings = builder.build()
+        bluetoothScanner?.startScan(filters, scanSettings, scanCallback)
 
         //Expose scanned device list every second
         if (pollingJob == null) {
@@ -220,8 +231,9 @@ class BleManager internal constructor(
         Timber.d("Stop Scanning")
         pollingJob?.cancel()
         pollingJob = null
-        bluetoothScanner.stopScan(scanCallback)
+        bluetoothScanner?.stopScan(scanCallback)
         isScanning = false
+        _bleState.tryEmit(BleState.Idle)
     }
 
     private var connectionCallback: BleManagerConnectionCallback? = null
@@ -272,7 +284,6 @@ class BleManager internal constructor(
         }
     }
 
-    @Synchronized
     private suspend fun internalConnect(
         address: String,
         callback: BleManagerConnectionCallback? = null
@@ -287,10 +298,12 @@ class BleManager internal constructor(
             ?: bluetoothAdapter.bondedDevices.firstOrNull {
                 it.address == address
             }?.let {
+                val serviceId = it.uuids?.first()?.uuid.toString()
                 BleDeviceModel(
                     id = it.address,
                     name = it.name,
-                    serviceId = it.uuids?.first()?.uuid.toString(),
+                    serviceId = serviceId,
+                    device = serviceId.toDeviceModel(),
                 )
             }
 
@@ -347,7 +360,6 @@ class BleManager internal constructor(
 
     private var disconnectingDeferred: CompletableDeferred<Boolean>? = null
 
-    @Synchronized
     private suspend fun internalDisconnect() {
         Timber.d("internal Disconnect")
         if (disconnectingDeferred == null
@@ -392,8 +404,8 @@ class BleManager internal constructor(
             BleManagerSendCallback(
                 id = id,
                 onSuccess = onSuccess,
-                onError = onError
-            )
+                onError = onError,
+            ),
         )
     }
 
@@ -411,7 +423,7 @@ class BleManager internal constructor(
                 if (!bleService.initialize()) {
                     Timber.e("Unable to initialize Bluetooth")
                     connectionCallback?.onConnectionError(BleError.INITIALIZING_FAILED)
-                    bleService.disconnectService(BleError.INITIALIZING_FAILED)
+                    bleService.disconnectService(BleServiceEvent.BleDeviceDisconnected(BleError.INITIALIZING_FAILED))
                 } else {
                     bleService.connect(connectedDevice.id)
                     scope.launch {
@@ -421,19 +433,23 @@ class BleManager internal constructor(
                                     connectionCallback?.onConnectionSuccess(connectedDevice)
                                     _bleState.tryEmit(BleState.Connected(connectedDevice))
                                 }
+
                                 is BleServiceEvent.BleDeviceDisconnected -> {
                                     _bleState.tryEmit(BleState.Disconnected(event.error))
                                     disconnected(event.error)
                                 }
+
                                 is BleServiceEvent.SuccessSend -> {
                                     _bleEvents.tryEmit(BleEvent.SendingEvent.SendSuccess(event.sendId))
                                 }
+
                                 is BleServiceEvent.SendAnswer -> {
                                     pendingSendRequest.firstOrNull { it.id == event.sendId }
                                         ?.let { callback ->
                                             callback.onSuccess(event.answer)
                                         }
                                 }
+
                                 is BleServiceEvent.ErrorSend -> {
                                     _bleEvents.tryEmit(BleEvent.Error.SendError(event.error))
                                     pendingSendRequest.firstOrNull { it.id == event.sendId }
@@ -441,6 +457,11 @@ class BleManager internal constructor(
                                             callback.onError(event.error)
                                         }
                                 }
+
+                                is BleServiceEvent.BleServiceDisconnected ->{
+                                    _bleState.tryEmit(BleState.Idle)
+                                }
+
                                 else -> Timber.d("Event not handle $event")
                             }
                         }
@@ -478,6 +499,25 @@ class BleManager internal constructor(
         }
     }
 
+    fun isEnabled(): Boolean = bluetoothAdapter.isEnabled
+
+    fun isPermissionGranted(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_SCAN,
+            ) == PermissionChecker.PERMISSION_GRANTED
+                    && ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT,
+            ) == PermissionChecker.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    fun isBleSupported(): Boolean = context.packageManager.run { hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) }
+
     companion object {
         private const val SCAN_MATCH_TTL = 5000L
         private const val SCAN_THROTTLE_MS = 1000L
@@ -494,4 +534,15 @@ class BleManager internal constructor(
         const val staxWriteWithoutResponseCharacteristicUUID =
             "13d63400-2c97-6004-0003-4c6564676572"
     }
+<<<<<<< HEAD
 }
+=======
+
+    private fun String.toDeviceModel(): BleDevice =
+        when {
+            equals(NANO_X_SERVICE_UUID, ignoreCase = true) -> BleDevice.NANOX
+            equals(STAX_SERVICE_UUID, ignoreCase = true) -> BleDevice.STAX
+            else -> { throw IllegalStateException("$this is not an known uuid")}
+        }
+}
+>>>>>>> 90a416c ([DSDK-72] Update code to escalate device model)
