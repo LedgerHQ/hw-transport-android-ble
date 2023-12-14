@@ -211,7 +211,7 @@ class BleManager internal constructor(
 
         //Expose scanned device list every second
         if (pollingJob == null) {
-            pollingJob = scope.launch() {
+            pollingJob = scope.launch {
                 while (true) {
                     //Check outdated match
                     val currentTimestamp: Long = Date().time
@@ -247,7 +247,7 @@ class BleManager internal constructor(
     fun connect(
         address: String,
         onConnectSuccess: (BleDeviceModel) -> Unit,
-        onConnectError: (BleError) -> Unit
+        onConnectError: (BleError) -> Unit,
     ) {
         val callback = object : BleManagerConnectionCallback {
             override fun onConnectionSuccess(device: BleDeviceModel) {
@@ -287,7 +287,7 @@ class BleManager internal constructor(
 
     private suspend fun internalConnect(
         address: String,
-        callback: BleManagerConnectionCallback? = null
+        callback: BleManagerConnectionCallback? = null,
     ) {
         Timber.d("($this) - Try Connecting to device with address $address")
         stopScanning()
