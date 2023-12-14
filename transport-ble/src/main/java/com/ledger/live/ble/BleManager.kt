@@ -534,9 +534,6 @@ class BleManager internal constructor(
         const val staxWriteWithoutResponseCharacteristicUUID =
             "13d63400-2c97-6004-0003-4c6564676572"
     }
-<<<<<<< HEAD
-}
-=======
 
     private fun String.toDeviceModel(): BleDevice =
         when {
@@ -545,4 +542,3 @@ class BleManager internal constructor(
             else -> { throw IllegalStateException("$this is not an known uuid")}
         }
 }
->>>>>>> 90a416c ([DSDK-72] Update code to escalate device model)
