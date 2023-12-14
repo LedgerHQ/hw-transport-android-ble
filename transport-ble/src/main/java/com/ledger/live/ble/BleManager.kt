@@ -200,17 +200,18 @@ class BleManager internal constructor(
 
         val builder =
             ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .setNumOfMatches(ScanSettings.MATCH_NUM_FEW_ADVERTISEMENT) // Add for being sure to have total informations
                 .setMatchMode(ScanSettings.MATCH_MODE_STICKY)// Same need higher signal for being listed
                 .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
-                .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH or ScanSettings.CALLBACK_TYPE_MATCH_LOST)
+                .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
 
         val scanSettings = builder.build()
         bluetoothScanner?.startScan(filters, scanSettings, scanCallback)
 
         //Expose scanned device list every second
         if (pollingJob == null) {
-            pollingJob = scope.launch() {
+            pollingJob = scope.launch {
                 while (true) {
                     //Check outdated match
                     val currentTimestamp: Long = Date().time
@@ -246,7 +247,7 @@ class BleManager internal constructor(
     fun connect(
         address: String,
         onConnectSuccess: (BleDeviceModel) -> Unit,
-        onConnectError: (BleError) -> Unit
+        onConnectError: (BleError) -> Unit,
     ) {
         val callback = object : BleManagerConnectionCallback {
             override fun onConnectionSuccess(device: BleDeviceModel) {
@@ -286,7 +287,7 @@ class BleManager internal constructor(
 
     private suspend fun internalConnect(
         address: String,
-        callback: BleManagerConnectionCallback? = null
+        callback: BleManagerConnectionCallback? = null,
     ) {
         Timber.d("($this) - Try Connecting to device with address $address")
         stopScanning()
