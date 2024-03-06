@@ -432,7 +432,7 @@ class BleManager internal constructor(
                             when (event) {
                                 is BleServiceEvent.BleDeviceConnected -> {
                                     connectionCallback?.onConnectionSuccess(connectedDevice)
-                                    _bleState.tryEmit(BleState.Connected(connectedDevice))
+                                    _bleState.tryEmit(BleState.Connected(connectedDevice = connectedDevice, mtu = event.mtu))
                                 }
 
                                 is BleServiceEvent.BleDeviceDisconnected -> {
