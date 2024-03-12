@@ -103,7 +103,7 @@ class BleService : Service() {
                     is BleServiceStateMachine.BleServiceState.Ready -> {
                         if (!isReady) {
                             isReady = true
-                            notify(BleServiceEvent.BleDeviceConnected)
+                            notify(BleServiceEvent.BleDeviceConnected(mtu = it.mtu))
                         }
 
                         it.answer?.let { answer ->

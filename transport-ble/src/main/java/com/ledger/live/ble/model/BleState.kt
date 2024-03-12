@@ -7,7 +7,8 @@ sealed class BleState {
     ): BleState()
 
     data class Connected (
-        val connectedDevice: BleDeviceModel
+        val connectedDevice: BleDeviceModel,
+        val mtu: Int,
     ): BleState()
 
     data class Disconnected(val error: BleError? = null): BleState()
