@@ -1,5 +1,7 @@
 package com.ledger.live.ble.extension
 
+import com.ledger.devicesdk.sdk.internal.transportble.extension.fromHexStringToBytes
+import com.ledger.devicesdk.sdk.internal.transportble.extension.toHexString
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested

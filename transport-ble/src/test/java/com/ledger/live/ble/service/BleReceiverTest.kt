@@ -8,11 +8,11 @@ import org.junit.jupiter.api.Test
 @DisplayName("BleReceiver Test")
 class BleReceiverTest {
 
-    private lateinit var bleReceiver: BleReceiver
+    private lateinit var bleReceiver: com.ledger.devicesdk.sdk.internal.transportble.service.BleReceiver
 
     @BeforeEach
     fun setup() {
-        bleReceiver = BleReceiver()
+        bleReceiver = com.ledger.devicesdk.sdk.internal.transportble.service.BleReceiver()
     }
 
     @Test

@@ -6,12 +6,12 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattService
 import android.content.Context
 import app.cash.turbine.test
-import com.ledger.live.ble.BleManager
-import com.ledger.live.ble.extension.fromHexStringToBytes
-import com.ledger.live.ble.extension.toHexString
-import com.ledger.live.ble.extension.toUUID
-import com.ledger.live.ble.model.BleError
-import com.ledger.live.ble.service.model.GattCallbackEvent
+import com.ledger.devicesdk.sdk.internal.transportble.BleManager
+import com.ledger.devicesdk.sdk.internal.transportble.extension.fromHexStringToBytes
+import com.ledger.devicesdk.sdk.internal.transportble.extension.toHexString
+import com.ledger.devicesdk.sdk.internal.transportble.extension.toUUID
+import com.ledger.devicesdk.sdk.internal.transportble.model.BleError
+import com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
@@ -28,10 +28,10 @@ import org.junit.jupiter.api.Test
 @DisplayName("Ble State Machine Test")
 class BleServiceStateMachineTest {
 
-    private lateinit var stateMachine: BleServiceStateMachine
-    private lateinit var mockedFlow: MutableSharedFlow<GattCallbackEvent>
+    private lateinit var stateMachine: com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine
+    private lateinit var mockedFlow: MutableSharedFlow<com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent>
     private val gatt: BluetoothGatt = mockk()
-    private val callbackFlow: BleGattCallbackFlow = mockk()
+    private val callbackFlow: com.ledger.devicesdk.sdk.internal.transportble.service.BleGattCallbackFlow = mockk()
     private val mtuSize = 153
 
     @BeforeEach
@@ -48,7 +48,12 @@ class BleServiceStateMachineTest {
         mockedFlow = MutableSharedFlow()
         every { callbackFlow.gattFlow } returns mockedFlow
 
-        stateMachine = BleServiceStateMachine(callbackFlow, "address", device)
+        stateMachine =
+            com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine(
+                callbackFlow,
+                "address",
+                device
+            )
         stateMachine.build(mockContext)
 
         val mockCharacteristic = mockk<BluetoothGattCharacteristic>() {
@@ -71,7 +76,7 @@ class BleServiceStateMachineTest {
         fun `Given state is created when waiting more than 5 seconds we should have a timeout error`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.Created
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Created
 
                 //When
                 delay(5000)
@@ -79,7 +84,8 @@ class BleServiceStateMachineTest {
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleError.CONNECTION_TIMEOUT),
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Error(
+                            com.ledger.devicesdk.sdk.internal.transportble.model.BleError.CONNECTION_TIMEOUT),
                         awaitItem()
                     )
                 }
@@ -92,12 +98,12 @@ class BleServiceStateMachineTest {
                 every { gatt.discoverServices() } returns true
 
                 //When
-                mockedFlow.emit(GattCallbackEvent.ConnectionState.Connected)
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.ConnectionState.Connected)
 
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.WaitingServices,
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingServices,
                         awaitItem()
                     )
                     verify { gatt.discoverServices() }
@@ -112,14 +118,15 @@ class BleServiceStateMachineTest {
         fun `Given state is NOT Waiting Services when receiving ServicesDiscovered Event then send Error State`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.Created
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Created
                 //When
-                mockedFlow.emit(GattCallbackEvent.ServicesDiscovered(emptyList()))
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.ServicesDiscovered(emptyList()))
 
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleError.INTERNAL_STATE),
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Error(
+                            com.ledger.devicesdk.sdk.internal.transportble.model.BleError.INTERNAL_STATE),
                         awaitItem()
                     )
                 }
@@ -129,20 +136,20 @@ class BleServiceStateMachineTest {
         fun `Given state is Waiting Services when receiving ServicesDiscovered Event try to Negotiate MTU`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.WaitingServices
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingServices
 
                 every { gatt.requestMtu(any()) } returns true
                 val mockedService = mockk<BluetoothGattService>()
                 val writeCharacteristic: BluetoothGattCharacteristic = mockk()
-                every { writeCharacteristic.uuid } returns BleManager.nanoXWriteWithResponseCharacteristicUUID.toUUID()
+                every { writeCharacteristic.uuid } returns com.ledger.devicesdk.sdk.internal.transportble.BleManager.nanoXWriteWithResponseCharacteristicUUID.toUUID()
 
                 val writeNoAnswerCharacteristic: BluetoothGattCharacteristic = mockk()
-                every { writeNoAnswerCharacteristic.uuid } returns BleManager.nanoXWriteWithoutResponseCharacteristicUUID.toUUID()
+                every { writeNoAnswerCharacteristic.uuid } returns com.ledger.devicesdk.sdk.internal.transportble.BleManager.nanoXWriteWithoutResponseCharacteristicUUID.toUUID()
 
                 val notifyCharacteristic: BluetoothGattCharacteristic = mockk()
-                every { notifyCharacteristic.uuid } returns BleManager.nanoXNotifyCharacteristicUUID.toUUID()
+                every { notifyCharacteristic.uuid } returns com.ledger.devicesdk.sdk.internal.transportble.BleManager.nanoXNotifyCharacteristicUUID.toUUID()
 
-                every { mockedService.uuid } returns BleManager.NANO_X_SERVICE_UUID.toUUID()
+                every { mockedService.uuid } returns com.ledger.devicesdk.sdk.internal.transportble.BleManager.NANO_X_SERVICE_UUID.toUUID()
                 every { mockedService.characteristics } returns listOf(
                     writeNoAnswerCharacteristic,
                     writeCharacteristic,
@@ -150,11 +157,11 @@ class BleServiceStateMachineTest {
                 )
 
                 //When
-                mockedFlow.emit(GattCallbackEvent.ServicesDiscovered(listOf(mockedService)))
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.ServicesDiscovered(listOf(mockedService)))
 
                 //Then
                 stateMachine.stateFlow.test {
-                    assertEquals(BleServiceStateMachine.BleServiceState.NegotiatingMtu, awaitItem())
+                    assertEquals(com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.NegotiatingMtu, awaitItem())
                     verify { gatt.requestMtu(any()) }
                 }
             }
@@ -163,16 +170,17 @@ class BleServiceStateMachineTest {
         fun `Given state is Waiting Services when receiving ServicesDiscovered Event with empty services Then send Error State`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.WaitingServices
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingServices
                 every { gatt.requestMtu(any()) } returns true
 
                 //When
-                mockedFlow.emit(GattCallbackEvent.ServicesDiscovered(emptyList()))
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.ServicesDiscovered(emptyList()))
 
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleError.SERVICE_NOT_FOUND),
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Error(
+                            com.ledger.devicesdk.sdk.internal.transportble.model.BleError.SERVICE_NOT_FOUND),
                         awaitItem()
                     )
                 }
@@ -186,15 +194,16 @@ class BleServiceStateMachineTest {
         fun `Given state is NOT Negotiating Mtu when receiving Mtu Negotiated Event then send Error State`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.WaitingServices
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingServices
 
                 //When
-                mockedFlow.emit(GattCallbackEvent.MtuNegociated(153))
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.MtuNegociated(153))
 
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleError.INTERNAL_STATE),
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Error(
+                            com.ledger.devicesdk.sdk.internal.transportble.model.BleError.INTERNAL_STATE),
                         awaitItem()
                     )
                 }
@@ -204,7 +213,7 @@ class BleServiceStateMachineTest {
         fun `Given state is Negotiating Mtu when receiving Mtu Negotiated Event then send try to enable notification`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.NegotiatingMtu
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.NegotiatingMtu
                 stateMachine.deviceService = mockk()
                 every { stateMachine.deviceService.notifyCharacteristic } returns mockk {
                     every { descriptors } returns listOf(
@@ -217,12 +226,12 @@ class BleServiceStateMachineTest {
                 every { gatt.writeDescriptor(any()) } returns true
 
                 //When
-                mockedFlow.emit(GattCallbackEvent.MtuNegociated(153))
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.MtuNegociated(153))
 
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.WaitingNotificationEnable,
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingNotificationEnable,
                         awaitItem()
                     )
                     assertEquals(153, stateMachine.negotiatedMtu)
@@ -238,15 +247,16 @@ class BleServiceStateMachineTest {
         fun `Given state is NOT Waiting Notification Enable when receiving Mtu Negotiated Event then send Error State`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.WaitingServices
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingServices
 
                 //When
-                mockedFlow.emit(GattCallbackEvent.WriteDescriptorAck(true))
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.WriteDescriptorAck(true))
 
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleError.INTERNAL_STATE),
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Error(
+                            com.ledger.devicesdk.sdk.internal.transportble.model.BleError.INTERNAL_STATE),
                         awaitItem()
                     )
                 }
@@ -257,14 +267,14 @@ class BleServiceStateMachineTest {
             runTest {
                 //Given
                 stateMachine.currentState =
-                    BleServiceStateMachine.BleServiceState.WaitingNotificationEnable
+                    com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingNotificationEnable
 
                 //When
-                mockedFlow.emit(GattCallbackEvent.WriteDescriptorAck(true))
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.WriteDescriptorAck(true))
 
                 //Then
                 stateMachine.stateFlow.test {
-                    assertEquals(BleServiceStateMachine.BleServiceState.CheckingMtu, awaitItem())
+                    assertEquals(com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.CheckingMtu, awaitItem())
                 }
             }
     }
@@ -277,15 +287,16 @@ class BleServiceStateMachineTest {
         fun `Given state is NOT Checking MTU when receiving Characteristic Changed Event then send Ready State`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.NegotiatingMtu
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.NegotiatingMtu
 
                 //When
-                mockedFlow.emit(GattCallbackEvent.CharacteristicChanged("${BleService.MTU_HANDSHAKE_COMMAND}${mtuSize.toByte().toHexString()}".fromHexStringToBytes()))
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.CharacteristicChanged("${com.ledger.devicesdk.sdk.internal.transportble.service.BleService.MTU_HANDSHAKE_COMMAND}${mtuSize.toByte().toHexString()}".fromHexStringToBytes()))
 
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Error(BleError.INTERNAL_STATE),
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Error(
+                            com.ledger.devicesdk.sdk.internal.transportble.model.BleError.INTERNAL_STATE),
                         awaitItem()
                     )
                 }
@@ -295,16 +306,16 @@ class BleServiceStateMachineTest {
         fun `Given state is Checking MTU when receiving Characteristic Changed Event then send Ready State`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.CheckingMtu
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.CheckingMtu
                 stateMachine.negotiatedMtu = mtuSize
 
                 //When
-                mockedFlow.emit(GattCallbackEvent.CharacteristicChanged("${BleService.MTU_HANDSHAKE_COMMAND}${mtuSize.toByte().toHexString()}".fromHexStringToBytes()))
+                mockedFlow.emit(com.ledger.devicesdk.sdk.internal.transportble.service.model.GattCallbackEvent.CharacteristicChanged("${com.ledger.devicesdk.sdk.internal.transportble.service.BleService.MTU_HANDSHAKE_COMMAND}${mtuSize.toByte().toHexString()}".fromHexStringToBytes()))
 
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.Ready(
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Ready(
                             stateMachine.deviceService,
                             mtuSize,
                             null
@@ -323,7 +334,7 @@ class BleServiceStateMachineTest {
                 //Given
                 stateMachine.bleSender.initialized(mtuSize, stateMachine.deviceService)
                 stateMachine.negotiatedMtu = mtuSize
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.Ready(
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.Ready(
                     stateMachine.deviceService,
                     mtuSize,
                     null
@@ -335,7 +346,7 @@ class BleServiceStateMachineTest {
                 //Then
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.WaitingResponse(id), awaitItem()
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingResponse(id), awaitItem()
                     )
                 }
             }
@@ -344,7 +355,7 @@ class BleServiceStateMachineTest {
         fun `Given state is NOT Ready when sending APDU then try initialize state machine by discovering services and queue APDU`() =
             runTest {
                 //Given
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.CheckingMtu
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.CheckingMtu
                 every { gatt.discoverServices() } returns true
 
                 //When
@@ -354,7 +365,7 @@ class BleServiceStateMachineTest {
                 assertEquals(1, stateMachine.bleSender.pendingApdu.size)
                 stateMachine.stateFlow.test {
                     assertEquals(
-                        BleServiceStateMachine.BleServiceState.WaitingServices, awaitItem()
+                        com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingServices, awaitItem()
                     )
                 }
             }
@@ -369,7 +380,7 @@ class BleServiceStateMachineTest {
                 //Given
                 stateMachine.bleSender.initialized(mtuSize, stateMachine.deviceService)
                 stateMachine.negotiatedMtu = mtuSize
-                stateMachine.currentState = BleServiceStateMachine.BleServiceState.WaitingResponse("id")
+                stateMachine.currentState = com.ledger.devicesdk.sdk.internal.transportble.service.BleServiceStateMachine.BleServiceState.WaitingResponse("id")
 
                 assertEquals(0, stateMachine.bleSender.pendingApdu.size)
                 assertNull(stateMachine.bleSender.pendingCommand)

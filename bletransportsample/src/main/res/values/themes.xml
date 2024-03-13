@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Theme.LiveTransportBle" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowContentOverlay">@null</item>
-    </style>
-</resources>

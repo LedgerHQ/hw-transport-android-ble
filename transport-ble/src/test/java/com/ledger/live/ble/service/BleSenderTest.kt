@@ -1,7 +1,7 @@
 package com.ledger.live.ble.service
 
-import com.ledger.live.ble.extension.fromHexStringToBytes
-import com.ledger.live.ble.model.BleDeviceService
+import com.ledger.devicesdk.sdk.internal.transportble.extension.fromHexStringToBytes
+import com.ledger.devicesdk.sdk.internal.transportble.model.BleDeviceService
 import io.mockk.*
 import org.junit.jupiter.api.*
 
@@ -9,16 +9,20 @@ import org.junit.jupiter.api.*
 class BleSenderTest {
 
     private lateinit var mockedCallback: (String) -> Unit
-    private lateinit var bleSender: BleSender
-    private lateinit var gattInteractor: GattInteractor
+    private lateinit var bleSender: com.ledger.devicesdk.sdk.internal.transportble.service.BleSender
+    private lateinit var gattInteractor: com.ledger.devicesdk.sdk.internal.transportble.service.GattInteractor
 
-    private val bleDeviceService: BleDeviceService = mockk()
+    private val bleDeviceService: com.ledger.devicesdk.sdk.internal.transportble.model.BleDeviceService = mockk()
 
     @BeforeEach
     fun setup() {
         gattInteractor = mockk()
         mockedCallback = mockk()
-        bleSender = BleSender(gattInteractor, "address", mockedCallback)
+        bleSender = com.ledger.devicesdk.sdk.internal.transportble.service.BleSender(
+            gattInteractor,
+            "address",
+            mockedCallback
+        )
     }
 
     @Nested
@@ -50,7 +54,11 @@ class BleSenderTest {
         @BeforeEach
         fun setup() {
             gattInteractor = mockk()
-            bleSender = BleSender(gattInteractor, "address", mockedCallback)
+            bleSender = com.ledger.devicesdk.sdk.internal.transportble.service.BleSender(
+                gattInteractor,
+                "address",
+                mockedCallback
+            )
             bleSender.initialized(153, bleDeviceService)
         }
 
@@ -83,7 +91,11 @@ class BleSenderTest {
         @BeforeEach
         fun setup() {
             gattInteractor = mockk()
-            bleSender = BleSender(gattInteractor, "address", mockedCallback)
+            bleSender = com.ledger.devicesdk.sdk.internal.transportble.service.BleSender(
+                gattInteractor,
+                "address",
+                mockedCallback
+            )
             bleSender.initialized(153, bleDeviceService)
         }
 
