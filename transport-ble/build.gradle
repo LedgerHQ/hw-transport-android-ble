@@ -1,8 +1,8 @@
 plugins {
-    id 'com.android.library'
-    id 'org.jetbrains.kotlin.android'
-    id 'maven-publish'
-    id 'de.mannodermaus.android-junit5'
+    id ('com.android.library').version("$agp_version")
+    id ('org.jetbrains.kotlin.android').version("$kotlin_version")
+    id ('maven-publish')
+    id ('de.mannodermaus.android-junit5').version("$junit5_version")
 }
 
 android {
@@ -38,7 +38,7 @@ dependencies {
 
     implementation 'com.jakewharton.timber:timber:5.0.1'
 
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.6.21"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.1"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.1"
 

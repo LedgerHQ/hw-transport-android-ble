@@ -1,22 +1,32 @@
 package com.ledger.live.bletransportsample.screen
 
-import android.annotation.SuppressLint
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import android.annotation.SuppressLint
+import com.ledger.live.ble.model.BleState
 import com.ledger.live.bletransportsample.R
-import com.ledger.live.bletransportsample.screen.model.BleUiState
 
 @SuppressLint("MissingPermission")
 @Composable
 fun BleScreen(
-    uiState: BleUiState,
+    uiState: BleState,
     toggleScan: () -> Unit,
     onDeviceClick: (String) -> Unit,
     sendSmallApdu: () -> Unit,
@@ -25,8 +35,8 @@ fun BleScreen(
 ) {
 
     when (uiState) {
-        is BleUiState.Idle,
-        is BleUiState.Scanning -> {
+        is BleState.Idle,
+        is BleState.Scanning -> {
             Column(
                 modifier = Modifier
                     .fillMaxWidth(),
@@ -35,20 +45,19 @@ fun BleScreen(
                 Button(
                     onClick = { toggleScan() }
                 ) {
-                    if (uiState is BleUiState.Scanning) {
-                        Text(text = "Stop Scanning (${uiState.devices.size})")
+                    if (uiState is BleState.Scanning) {
+                        Text(text = "Stop Scanning (${uiState.scannedDevices.size})")
                     } else {
                         Text(text = "Start Scan")
                     }
                 }
 
-                if (uiState is BleUiState.Scanning) {
-                    if (uiState.devices.isEmpty()) {
+                if (uiState is BleState.Scanning) {
+                    if (uiState.scannedDevices.isEmpty()) {
                         Text(text = "No devices found, please scan again")
                     } else {
-
                         LazyColumn {
-                            items(items = uiState.devices) { device ->
+                            items(items = uiState.scannedDevices) { device ->
                                 ScannedDeviceItem(
                                     title = device.name,
                                     onClick = { onDeviceClick(device.id) })
@@ -60,9 +69,9 @@ fun BleScreen(
                 }
             }
         }
-        is BleUiState.Connected -> {
+        is BleState.Connected -> {
             Column() {
-                Text(text = "Connected to device : ${uiState.device.name}")
+                Text(text = "Connected to device : ${uiState.connectedDevice.name}")
 
                 Button(onClick = sendSmallApdu) {
                     Text(text = "Send small APDU")

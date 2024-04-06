@@ -1,15 +1,15 @@
 package com.ledger.live.bletransportsample.screen.callback
 
-import android.annotation.SuppressLint
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import android.annotation.SuppressLint
+import android.content.Context
 import com.ledger.live.ble.BleManager
 import com.ledger.live.ble.BleManagerFactory
-import com.ledger.live.bletransportsample.screen.model.BleUiState
-import com.ledger.live.bletransportsample.screen.model.UiDevice
-import kotlinx.coroutines.flow.*
+import com.ledger.live.ble.model.BleState
 import timber.log.Timber
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 
 @SuppressLint("MissingPermission")
 class CallbackViewModel(
@@ -17,8 +17,8 @@ class CallbackViewModel(
 ) : ViewModel() {
 
     private var isScanning: Boolean = false
-    private val _uiState: MutableSharedFlow<BleUiState> = MutableSharedFlow(extraBufferCapacity = 1)
-    val uiState: Flow<BleUiState>
+    private val _uiState: MutableSharedFlow<BleState> = MutableSharedFlow(extraBufferCapacity = 1)
+    val uiState: Flow<BleState>
         get() = _uiState
 
     private val bleManager: BleManager = BleManagerFactory.newInstance(context)
@@ -27,20 +27,18 @@ class CallbackViewModel(
         if (isScanning) {
             isScanning = false
             bleManager.stopScanning()
-            _uiState.tryEmit(BleUiState.Idle)
+            _uiState.tryEmit(BleState.Idle)
         } else {
             isScanning = true
             bleManager.startScanning {
                 Timber.d("Scanned device callback $it")
-                val scanningState = BleUiState.Scanning(
-                    devices = it.map { device -> UiDevice(device.id, device.name) }
-                )
+                val scanningState = BleState.Scanning(scannedDevices = it)
                 _uiState.tryEmit(scanningState)
             }
 
             _uiState.tryEmit(
-                BleUiState.Scanning(
-                    devices = emptyList()
+                BleState.Scanning(
+                    scannedDevices = emptyList()
                 )
             )
         }
@@ -53,13 +51,12 @@ class CallbackViewModel(
             onConnectError = {
                 Timber.e("Disconnect Callback => cause: $it")
                 isScanning = false
-                _uiState.tryEmit(BleUiState.Idle)
+                _uiState.tryEmit(BleState.Idle)
             },
             onConnectSuccess = {
                 Timber.d("Connected Callback")
                 isScanning = false
-                val device = it
-                _uiState.tryEmit(BleUiState.Connected(UiDevice(device.id, device.name)))
+                _uiState.tryEmit(BleState.Connected(it))
             }
         )
     }
@@ -97,7 +94,7 @@ class CallbackViewModel(
     fun disconnect() {
         bleManager.disconnect {
             Timber.d("Disconnection has been done")
-            _uiState.tryEmit(BleUiState.Idle)
+            _uiState.tryEmit(BleState.Idle)
         }
     }
 
