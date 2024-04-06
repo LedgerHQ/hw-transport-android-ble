@@ -1,7 +1,7 @@
 package com.ledger.live.ble.model
 
 sealed class BleState {
-    data object Idle: BleState()
+    object Idle: BleState()
     data class Scanning(
         val scannedDevices: List<BleDeviceModel>
     ): BleState()

@@ -13,8 +13,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.ledger.live.bletransportsample.screen.callback.CallbackScreen
 import com.ledger.live.bletransportsample.screen.callback.CallbackViewModel
-import com.ledger.live.bletransportsample.screen.flow.FlowScreen
-import com.ledger.live.bletransportsample.screen.flow.FlowViewModel
 import com.ledger.live.bletransportsample.ui.theme.LiveTransportBleTheme
 import timber.log.Timber
 import timber.log.Timber.DebugTree
@@ -28,7 +26,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val callbackViewModel = CallbackViewModel.CallbackViewModelFactory(this).create(CallbackViewModel::class.java)
-        val flowViewModel = FlowViewModel.FlowViewModelFactory(this).create(FlowViewModel::class.java)
+//        val flowViewModel = Scan.FlowViewModelFactory(this).create(FlowViewModel::class.java)
 
         setContent {
             LiveTransportBleTheme {
@@ -41,7 +39,7 @@ class MainActivity : ComponentActivity() {
                     //CallbackScreen(callbackViewModel)
 
                     // For Flow usage
-                    FlowScreen(flowViewModel)
+//                    FlowScreen(flowViewModel)
                 }
             }
         }
