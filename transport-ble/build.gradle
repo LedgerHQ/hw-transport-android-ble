@@ -59,10 +59,10 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 }
 
-task sourceJar(type: Jar) {
-    from android.sourceSets.main.java.srcDirs
-    archiveClassifier.set("sources")
-}
+//task sourceJar(type: Jar) {
+//    from android.sourceSets.main.java.srcDirs
+//    archiveClassifier.set("sources")
+//}
 
 publishing {
     publications {
@@ -77,8 +77,8 @@ publishing {
         debug(MavenPublication) {
             groupId 'com.ledger.live'
             artifactId 'android-transport-ble'
-            version '1.0.0-rc15'
-            artifact(sourceJar)
+            version "0.0.1-SNAPSHOT"
+            //artifact(sourceJar)
             afterEvaluate {
                 //artifact("$buildDir/outputs/aar/transport-ble-debug.aar")
                 from components.debug
