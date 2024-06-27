@@ -31,6 +31,11 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+    publishing {
+        singleVariant('release') {
+            withSourcesJar()
+        }
+    }
 }
 
 dependencies {
@@ -59,31 +64,34 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 }
 
-task sourceJar(type: Jar) {
-    from android.sourceSets.main.java.srcDirs
-    archiveClassifier.set("sources")
-}
+//task sourceJar(type: Jar) {
+//    from android.sourceSets.main.java.srcDirs
+//    archiveClassifier.set("sources")
+//}
 
 publishing {
     publications {
-        /*release(MavenPublication) {
-            groupId 'com.ledger.live'
-            artifactId 'android-transport-ble'
-            version '1.0.0'
-
-            artifact("$buildDir/outputs/aar/transport-ble-release.aar")
-        }*/
-
-        debug(MavenPublication) {
+        release(MavenPublication) {
             groupId 'com.ledger.live'
             artifactId 'android-transport-ble'
             version '1.0.0-rc15'
-            artifact(sourceJar)
+
             afterEvaluate {
-                //artifact("$buildDir/outputs/aar/transport-ble-debug.aar")
-                from components.debug
+                // artifact("$buildDir/outputs/aar/transport-ble-release.aar")
+                from components.release
             }
         }
+
+//        debug(MavenPublication) {
+//            groupId 'com.ledger.live'
+//            artifactId 'android-transport-ble'
+//            version "1.0.0-rc15"
+//            //artifact(sourceJar)
+//            afterEvaluate {
+//                //artifact("$buildDir/outputs/aar/transport-ble-debug.aar")
+//                from components.debug
+//            }
+//        }
     }
 
     /*repositories {
